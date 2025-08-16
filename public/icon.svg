@@ -1,0 +1,20 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Hexagon background -->
+  <path d="M8 5.732L24 5.732L28.928 14L28.928 22L24 30.268L8 30.268L3.072 22L3.072 14L8 5.732Z" 
+        fill="#0F172A" stroke="#22D3EE" stroke-width="2"/>
+  
+  <!-- Central vertical line -->
+  <rect x="15" y="8" width="2" height="16" fill="#22D3EE" rx="1"/>
+  
+  <!-- Left flowing line -->
+  <path d="M6 12C8 10, 10 14, 12 12C14 10, 16 14, 14 16C12 18, 10 14, 8 16C6 18, 4 14, 6 12Z" 
+        fill="none" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- Right flowing line -->
+  <path d="M18 16C20 18, 22 14, 24 16C26 18, 28 14, 26 12C24 10, 22 14, 20 12C18 10, 16 14, 18 16Z" 
+        fill="none" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- Small dots -->
+  <circle cx="10" cy="20" r="1" fill="#22D3EE"/>
+  <circle cx="22" cy="12" r="1" fill="#22D3EE"/>
+</svg>

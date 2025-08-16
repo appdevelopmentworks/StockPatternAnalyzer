@@ -1,0 +1,20 @@
+<svg width="180" height="180" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg">
+  <!-- Hexagon background -->
+  <path d="M45 32.196L135 32.196L162.27 78L162.27 126L135 171.804L45 171.804L17.73 126L17.73 78L45 32.196Z" 
+        fill="#0F172A" stroke="#22D3EE" stroke-width="4"/>
+  
+  <!-- Central vertical line -->
+  <rect x="85" y="45" width="10" height="90" fill="#22D3EE" rx="5"/>
+  
+  <!-- Left flowing line -->
+  <path d="M34 68C45 56, 56 79, 68 68C79 56, 90 79, 79 90C68 102, 56 79, 45 90C34 102, 23 79, 34 68Z" 
+        fill="none" stroke="#F59E0B" stroke-width="6" stroke-linecap="round"/>
+  
+  <!-- Right flowing line -->
+  <path d="M101 90C113 102, 124 79, 135 90C147 102, 158 79, 147 68C135 56, 124 79, 113 68C101 56, 90 79, 101 90Z" 
+        fill="none" stroke="#F59E0B" stroke-width="6" stroke-linecap="round"/>
+  
+  <!-- Small dots -->
+  <circle cx="56" cy="113" r="4" fill="#22D3EE"/>
+  <circle cx="124" cy="68" r="4" fill="#22D3EE"/>
+</svg>
