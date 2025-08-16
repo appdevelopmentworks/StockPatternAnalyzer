@@ -548,11 +548,11 @@ export default function Home() {
                 <div className="grid grid-cols-8 gap-1">
                   <div></div>
                   {["日", "月", "火", "水", "木", "金", "土"].map((day) => (
-                    <div key={day} className="text-center text-xs font-medium">{day}</div>
+                    <div key={day} className="text-center text-sm font-medium">{day}</div>
                   ))}
                   {["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"].map((month, mIndex) => (
                     <React.Fragment key={month}>
-                      <div className="text-xs font-medium">{month}</div>
+                      <div className="text-sm font-medium">{month}</div>
                       {[0, 1, 2, 3, 4, 5, 6].map((dIndex) => {
                         const data = heatmapData.find(d => d.x === dIndex && d.y === mIndex);
                         const value = data?.value || 0;
@@ -563,7 +563,7 @@ export default function Home() {
                         return (
                           <div
                             key={`${mIndex}-${dIndex}`}
-                            className="aspect-square rounded flex items-center justify-center text-xs"
+                            className="aspect-square rounded flex items-center justify-center text-sm font-medium"
                             style={{ backgroundColor: color }}
                             title={`${value.toFixed(2)}%`}
                           >

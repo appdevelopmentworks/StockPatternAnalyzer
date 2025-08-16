@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 
 interface CandlestickData {
   date: string;
@@ -20,7 +20,67 @@ interface CandlestickChartProps {
   currencySymbol: string;
 }
 
+interface TooltipData {
+  date: string;
+  displayDate: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  change: number;
+  changePercent: number;
+  ma5?: number | null;
+  ma20?: number | null;
+  ma200?: number | null;
+}
+
 export default function CandlestickChart({ data, currencySymbol }: CandlestickChartProps) {
+  const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  // ツールチップのイベントハンドラー
+  const handleMouseEnter = (event: React.MouseEvent, item: CandlestickData, index: number) => {
+    const prevItem = index > 0 ? data[index - 1] : item;
+    const change = item.close - prevItem.close;
+    const changePercent = ((change / prevItem.close) * 100);
+    
+    const tooltipInfo: TooltipData = {
+      date: item.date,
+      displayDate: item.displayDate,
+      open: item.open,
+      high: item.high,
+      low: item.low,
+      close: item.close,
+      volume: item.volume,
+      change: change,
+      changePercent: changePercent,
+      ma5: item.ma5,
+      ma20: item.ma20,
+      ma200: item.ma200
+    };
+    
+    setTooltipData(tooltipInfo);
+    setShowTooltip(true);
+  };
+  
+  const handleMouseMove = (event: React.MouseEvent<SVGRectElement>) => {
+    // SVG要素からの相対位置を正確に取得
+    const svg = event.currentTarget.ownerSVGElement;
+    if (svg) {
+      const svgRect = svg.getBoundingClientRect();
+      setTooltipPosition({
+        x: event.clientX - svgRect.left,
+        y: event.clientY - svgRect.top
+      });
+    }
+  };
+  
+  const handleMouseLeave = () => {
+    setShowTooltip(false);
+    setTooltipData(null);
+  };
   if (!data || data.length === 0) {
     return (
       <div className="w-full h-[400px] flex items-center justify-center text-gray-500">
@@ -40,7 +100,7 @@ export default function CandlestickChart({ data, currencySymbol }: CandlestickCh
 
   // 価格をピクセル座標に変換する関数
   const priceToY = (price: number) => {
-    return ((paddedMax - price) / adjustedRange) * 350 + 20; // 350pxの高さ、20pxのマージン
+    return ((paddedMax - price) / adjustedRange) * 380 + 20; // 380pxの高さに変更、1ラベルマージン
   };
 
   // チャートの幅とキャンドルの幅を計算
@@ -49,7 +109,7 @@ export default function CandlestickChart({ data, currencySymbol }: CandlestickCh
   const candleSpacing = chartWidth / data.length;
 
   return (
-    <div className="w-full h-[400px] bg-white dark:bg-gray-800 border rounded-lg p-4">
+    <div className="w-full h-[500px] bg-white dark:bg-gray-800 border rounded-lg p-4">
       <div className="mb-4">
         <h3 className="text-lg font-semibold">ローソク足チャート</h3>
         <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -57,11 +117,11 @@ export default function CandlestickChart({ data, currencySymbol }: CandlestickCh
         </p>
       </div>
       
-      <div className="relative w-full h-[350px] overflow-x-auto">
+      <div className="relative w-full h-[450px] overflow-x-auto">
         <div className="flex justify-end"> {/* チャートを右寄せに */}
           <svg 
             width={Math.max(chartWidth + 100, data.length * 10 + 100)} 
-            height="350" 
+            height="420" 
             className="border rounded"
           >
             {/* 背景グリッド */}
@@ -153,37 +213,256 @@ export default function CandlestickChart({ data, currencySymbol }: CandlestickCh
                     fill={fillColor}
                     stroke={color}
                     strokeWidth="1"
-                  >
-                    <title>
-                      {item.displayDate}
-                      {'\n'}始値: {currencySymbol}{item.open?.toFixed(2)}
-                      {'\n'}高値: {currencySymbol}{item.high?.toFixed(2)}
-                      {'\n'}安値: {currencySymbol}{item.low?.toFixed(2)}
-                      {'\n'}終値: {currencySymbol}{item.close?.toFixed(2)}
-                      {'\n'}出来高: {(item.volume / 1000000).toFixed(1)}M
-                      {item.ma5 && `\nMA5: ${currencySymbol}${item.ma5.toFixed(2)}`}
-                      {item.ma20 && `\nMA20: ${currencySymbol}${item.ma20.toFixed(2)}`}
-                      {item.ma200 && `\nMA200: ${currencySymbol}${item.ma200.toFixed(2)}`}
-                    </title>
-                  </rect>
+                  />
+                  
+                  {/* 透明なホバー領域 */}
+                  <rect
+                    x={x - candleSpacing / 2}
+                    y={20}
+                    width={candleSpacing}
+                    height={380}
+                    fill="transparent"
+                    style={{ cursor: 'crosshair' }}
+                    onMouseEnter={(e) => handleMouseEnter(e, item, index)}
+                    onMouseMove={handleMouseMove}
+                    onMouseLeave={handleMouseLeave}
+                  />
                 </g>
               );
             })}
             
+            {/* Y軸目盛り線 */}
+            <g className="stroke-gray-200 dark:stroke-gray-700" strokeWidth="1" strokeDasharray="2,2">
+              {/* 水平グリッドライン */}
+              <line x1="50" y1="20" x2={Math.max(chartWidth + 100, data.length * 10 + 100)} y2="20" stroke="currentColor" />
+              <line x1="50" y1="210" x2={Math.max(chartWidth + 100, data.length * 10 + 100)} y2="210" stroke="currentColor" />
+              <line x1="50" y1="400" x2={Math.max(chartWidth + 100, data.length * 10 + 100)} y2="400" stroke="currentColor" strokeDasharray="none" />
+            </g>
+            
             {/* Y軸ラベルをSVG内に移動 */}
             <g className="text-xs fill-gray-600 dark:fill-gray-400">
               <text x="5" y="25" textAnchor="start">{currencySymbol}{paddedMax.toFixed(0)}</text>
-              <text x="5" y="180" textAnchor="start">{currencySymbol}{((paddedMax + paddedMin) / 2).toFixed(0)}</text>
-              <text x="5" y="340" textAnchor="start">{currencySymbol}{paddedMin.toFixed(0)}</text>
+              <text x="5" y="210" textAnchor="start">{currencySymbol}{((paddedMax + paddedMin) / 2).toFixed(0)}</text>
+              <text x="5" y="400" textAnchor="start">{currencySymbol}{paddedMin.toFixed(0)}</text>
+            </g>
+            
+            {/* X軸目盛り線と垂直グリッド */}
+            <g className="stroke-gray-300 dark:stroke-gray-600" strokeWidth="1">
+              {/* X軸ベースライン */}
+              <line x1="50" y1="400" x2={Math.max(chartWidth + 100, data.length * 10 + 100)} y2="400" stroke="currentColor" />
+              
+              {(() => {
+                const tickCount = Math.min(10, Math.floor(data.length / 5));
+                const interval = Math.floor(data.length / tickCount);
+                const ticks = [];
+                
+                for (let i = 0; i < tickCount; i++) {
+                  const index = i * interval;
+                  if (index < data.length) {
+                    const x = 50 + index * candleSpacing + candleSpacing / 2;
+                    // 目盛り線
+                    ticks.push(
+                      <line
+                        key={`tick-${index}`}
+                        x1={x}
+                        y1="400"
+                        x2={x}
+                        y2="410"
+                        stroke="currentColor"
+                      />
+                    );
+                    // 垂直グリッドライン
+                    ticks.push(
+                      <line
+                        key={`grid-${index}`}
+                        x1={x}
+                        y1="20"
+                        x2={x}
+                        y2="400"
+                        stroke="currentColor"
+                        strokeDasharray="2,2"
+                        opacity="0.3"
+                      />
+                    );
+                  }
+                }
+                
+                // 最後の目盛りを追加
+                if (data.length > 0 && tickCount > 0) {
+                  const lastIndex = data.length - 1;
+                  const lastInterval = (tickCount - 1) * interval;
+                  if (lastIndex > lastInterval) {
+                    const x = 50 + lastIndex * candleSpacing + candleSpacing / 2;
+                    ticks.push(
+                      <line
+                        key={`tick-${lastIndex}`}
+                        x1={x}
+                        y1="400"
+                        x2={x}
+                        y2="410"
+                        stroke="currentColor"
+                      />
+                    );
+                    ticks.push(
+                      <line
+                        key={`grid-${lastIndex}`}
+                        x1={x}
+                        y1="20"
+                        x2={x}
+                        y2="400"
+                        stroke="currentColor"
+                        strokeDasharray="2,2"
+                        opacity="0.3"
+                      />
+                    );
+                  }
+                }
+                
+                return ticks;
+              })()}
             </g>
           </svg>
         </div>
         
+        {/* カスタムツールチップ */}
+        {showTooltip && tooltipData && (
+          <div
+            className="absolute z-10 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-3 text-sm pointer-events-none"
+            style={{
+              left: `${tooltipPosition.x + (tooltipPosition.x > 250 ? -220 : 10)}px`,
+              top: `${tooltipPosition.y + (tooltipPosition.y > 200 ? -120 : 10)}px`,
+              maxWidth: '250px',
+              minWidth: '200px'
+            }}
+          >
+            <div className="font-semibold text-base mb-2 text-gray-900 dark:text-gray-100">
+              {new Date(tooltipData.date).toLocaleDateString('ja-JP', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                weekday: 'short'
+              })}
+            </div>
+            
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+              <div className="text-gray-600 dark:text-gray-400">始値:</div>
+              <div className="font-medium text-gray-900 dark:text-gray-100">
+                {currencySymbol}{tooltipData.open.toFixed(2)}
+              </div>
+              
+              <div className="text-gray-600 dark:text-gray-400">高値:</div>
+              <div className="font-medium text-gray-900 dark:text-gray-100">
+                {currencySymbol}{tooltipData.high.toFixed(2)}
+              </div>
+              
+              <div className="text-gray-600 dark:text-gray-400">安値:</div>
+              <div className="font-medium text-gray-900 dark:text-gray-100">
+                {currencySymbol}{tooltipData.low.toFixed(2)}
+              </div>
+              
+              <div className="text-gray-600 dark:text-gray-400">終値:</div>
+              <div className="font-medium text-gray-900 dark:text-gray-100">
+                {currencySymbol}{tooltipData.close.toFixed(2)}
+              </div>
+              
+              <div className="text-gray-600 dark:text-gray-400">変動:</div>
+              <div className={`font-medium ${
+                tooltipData.change >= 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {tooltipData.change >= 0 ? '+' : ''}{currencySymbol}{tooltipData.change.toFixed(2)}
+                <span className="ml-1">({tooltipData.changePercent >= 0 ? '+' : ''}{tooltipData.changePercent.toFixed(2)}%)</span>
+              </div>
+              
+              <div className="text-gray-600 dark:text-gray-400">出来高:</div>
+              <div className="font-medium text-gray-900 dark:text-gray-100">
+                {(tooltipData.volume / 1000000).toFixed(1)}M
+              </div>
+            </div>
+            
+            {/* 移動平均線 */}
+            {(tooltipData.ma5 || tooltipData.ma20 || tooltipData.ma200) && (
+              <>
+                <div className="border-t border-gray-200 dark:border-gray-600 mt-2 pt-2">
+                  <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">移動平均</div>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    {tooltipData.ma5 && (
+                      <div>
+                        <span className="text-orange-500">MA5:</span>
+                        <div className="font-medium">{currencySymbol}{tooltipData.ma5.toFixed(2)}</div>
+                      </div>
+                    )}
+                    {tooltipData.ma20 && (
+                      <div>
+                        <span className="text-purple-500">MA20:</span>
+                        <div className="font-medium">{currencySymbol}{tooltipData.ma20.toFixed(2)}</div>
+                      </div>
+                    )}
+                    {tooltipData.ma200 && (
+                      <div>
+                        <span className="text-green-500">MA200:</span>
+                        <div className="font-medium">{currencySymbol}{tooltipData.ma200.toFixed(2)}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+        
         {/* X軸ラベル */}
-        <div className="flex justify-between mt-2 text-xs text-gray-600 dark:text-gray-400 px-12">
-          <span>{data[0]?.displayDate}</span>
-          <span>{data[Math.floor(data.length / 2)]?.displayDate}</span>
-          <span>{data[data.length - 1]?.displayDate}</span>
+        <div className="mt-4">
+          <div className="relative w-full" style={{ marginLeft: '50px', marginRight: '50px' }}>
+            <div className="relative" style={{ width: `${Math.max(chartWidth, data.length * 10)}px` }}>
+              {(() => {
+                const tickCount = Math.min(10, Math.floor(data.length / 5));
+                const interval = Math.floor(data.length / tickCount);
+                const labels = [];
+                
+                for (let i = 0; i < tickCount; i++) {
+                  const index = i * interval;
+                  if (index < data.length) {
+                    const leftPosition = (index * candleSpacing + candleSpacing / 2) / Math.max(chartWidth, data.length * 10) * 100;
+                    labels.push(
+                      <span 
+                        key={index} 
+                        className="absolute text-xs text-gray-600 dark:text-gray-400 text-center transform -translate-x-1/2"
+                        style={{ 
+                          left: `${leftPosition}%`,
+                          minWidth: '60px'
+                        }}
+                      >
+                        {data[index]?.displayDate}
+                      </span>
+                    );
+                  }
+                }
+                
+                // 最後のデータポイントを追加
+                if (data.length > 0 && tickCount > 0) {
+                  const lastIndex = data.length - 1;
+                  const lastInterval = (tickCount - 1) * interval;
+                  if (lastIndex > lastInterval) {
+                    const leftPosition = (lastIndex * candleSpacing + candleSpacing / 2) / Math.max(chartWidth, data.length * 10) * 100;
+                    labels.push(
+                      <span 
+                        key={lastIndex} 
+                        className="absolute text-xs text-gray-600 dark:text-gray-400 text-center transform -translate-x-1/2"
+                        style={{ 
+                          left: `${leftPosition}%`,
+                          minWidth: '60px'
+                        }}
+                      >
+                        {data[lastIndex]?.displayDate}
+                      </span>
+                    );
+                  }
+                }
+                
+                return labels;
+              })()}
+            </div>
+          </div>
         </div>
       </div>
       
