@@ -430,7 +430,7 @@ export default function Home() {
 
         {/* メインコンテンツ */}
         <Tabs defaultValue="price" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 relative z-10">
             <TabsTrigger value="price">価格推移</TabsTrigger>
             <TabsTrigger value="weekday">曜日効果</TabsTrigger>
             <TabsTrigger value="monthly">月別分析</TabsTrigger>
