@@ -9,16 +9,9 @@ export const metadata: Metadata = {
   title: "Stock Pattern Analyzer",
   description: "Advanced stock analysis with real-time data",
   icons: {
-    icon: [
-      { url: '/icon.svg', type: 'image/svg+xml' },
-      { url: '/favicon.ico', sizes: '32x32', type: 'image/x-icon' }
-    ],
+    icon: '/favicon.ico',
     shortcut: '/favicon.ico',
-    apple: {
-      url: '/icon.svg',
-      sizes: '180x180',
-      type: 'image/svg+xml'
-    },
+    apple: '/logo.png',
   },
 };
 

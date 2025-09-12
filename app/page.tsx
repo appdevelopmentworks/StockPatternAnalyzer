@@ -87,7 +87,12 @@ export default function Home() {
   const [chartSortBy, setChartSortBy] = useState<'totalReturn' | 'winRate'>('totalReturn');
   const [displayCount, setDisplayCount] = useState<string>('50');
   const [tradeFilter, setTradeFilter] = useState<string>('all');
+  const [mounted, setMounted] = useState(false);
   const { theme, setTheme } = useTheme();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // 戦略の説明
   const strategyDescriptions: { [key: string]: string } = {
@@ -354,7 +359,7 @@ export default function Home() {
                   size="icon"
                   onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                 >
-                  {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  {mounted && theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 </Button>
               </div>
             </div>
@@ -578,7 +583,7 @@ export default function Home() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="backtest">
+          <TabsContent value="backtest" className="mt-6">
             <Card>
               <CardHeader>
                 <CardTitle>バックテスト結果</CardTitle>
