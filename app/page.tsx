@@ -583,7 +583,7 @@ export default function Home() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="backtest" className="mt-6">
+          <TabsContent value="backtest" className="mt-12">
             <Card>
               <CardHeader>
                 <CardTitle>バックテスト結果</CardTitle>
