@@ -563,6 +563,123 @@ export const calculateChoppinessIndex = (data: any[], period: number = 14): (num
 };
 
 /**
+ * EMA（指数移動平均）を計算する
+ * @param data 株価データ
+ * @param period 期間
+ * @param field フィールド名（デフォルト: 'close'）
+ * @returns EMA配列
+ */
+export const calculateEMA = (data: any[], period: number, field: string = 'close'): (number | null)[] => {
+  const ema: (number | null)[] = new Array(data.length).fill(null);
+
+  if (data.length < period) return ema;
+
+  // 最初のEMAは単純移動平均
+  let sum = 0;
+  for (let i = 0; i < period; i++) {
+    sum += data[i][field];
+  }
+  ema[period - 1] = sum / period;
+
+  // 平滑化定数
+  const multiplier = 2 / (period + 1);
+
+  // 以降はEMA計算
+  for (let i = period; i < data.length; i++) {
+    ema[i] = (data[i][field] - ema[i - 1]!) * multiplier + ema[i - 1]!;
+  }
+
+  return ema;
+};
+
+/**
+ * Aroon指標を計算する
+ * @param data 株価データ
+ * @param period 期間（デフォルト25日）
+ * @returns {aroonUp, aroonDown}の配列
+ */
+export const calculateAroon = (data: any[], period: number = 25): Array<{aroonUp: number, aroonDown: number} | null> => {
+  const aroon: Array<{aroonUp: number, aroonDown: number} | null> = new Array(data.length).fill(null);
+
+  if (data.length < period) return aroon;
+
+  for (let i = period - 1; i < data.length; i++) {
+    const slice = data.slice(i - period + 1, i + 1);
+
+    // 最高値と最安値のインデックスを見つける
+    let highestIndex = 0;
+    let lowestIndex = 0;
+    let highestPrice = slice[0].high;
+    let lowestPrice = slice[0].low;
+
+    for (let j = 1; j < slice.length; j++) {
+      if (slice[j].high > highestPrice) {
+        highestPrice = slice[j].high;
+        highestIndex = j;
+      }
+      if (slice[j].low < lowestPrice) {
+        lowestPrice = slice[j].low;
+        lowestIndex = j;
+      }
+    }
+
+    // 最高値/最安値からの日数
+    const daysSinceHigh = period - 1 - highestIndex;
+    const daysSinceLow = period - 1 - lowestIndex;
+
+    // Aroon計算
+    const aroonUp = ((period - daysSinceHigh) / period) * 100;
+    const aroonDown = ((period - daysSinceLow) / period) * 100;
+
+    aroon[i] = {
+      aroonUp: isFinite(aroonUp) ? aroonUp : 0,
+      aroonDown: isFinite(aroonDown) ? aroonDown : 0
+    };
+  }
+
+  return aroon;
+};
+
+/**
+ * Elder's Force Index（エルダーのフォースインデックス）を計算する
+ * @param data 株価データ
+ * @param period EMA期間（デフォルト13日）
+ * @returns フォースインデックス配列
+ */
+export const calculateForceIndex = (data: any[], period: number = 13): (number | null)[] => {
+  const forceIndex: (number | null)[] = new Array(data.length).fill(null);
+
+  if (data.length < 2) return forceIndex;
+
+  // Raw Force Indexを計算
+  const rawForce: number[] = new Array(data.length).fill(0);
+  for (let i = 1; i < data.length; i++) {
+    const priceChange = data[i].close - data[i - 1].close;
+    rawForce[i] = priceChange * data[i].volume;
+  }
+
+  // EMAでスムージング
+  if (data.length < period + 1) return forceIndex;
+
+  // 最初のEMAは単純移動平均
+  let sum = 0;
+  for (let i = 1; i <= period; i++) {
+    sum += rawForce[i];
+  }
+  forceIndex[period] = sum / period;
+
+  // 平滑化定数
+  const multiplier = 2 / (period + 1);
+
+  // 以降はEMA計算
+  for (let i = period + 1; i < data.length; i++) {
+    forceIndex[i] = (rawForce[i] - forceIndex[i - 1]!) * multiplier + forceIndex[i - 1]!;
+  }
+
+  return forceIndex;
+};
+
+/**
  * データの妥当性をチェックする
  */
 export const validateStockData = (data: any[]): any[] => {

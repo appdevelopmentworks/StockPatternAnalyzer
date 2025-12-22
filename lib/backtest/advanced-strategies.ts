@@ -1,5 +1,5 @@
 import { StockData, Trade, BacktestResult } from './types';
-import { calculateBacktestStats, getInitialCapital, validateStockData, calculateADX, calculateWilliamsR, calculateCCI, calculateParabolicSAR, calculateATR, calculateMA, calculateSuperTrend, calculateHeikenAshi, calculateChoppinessIndex } from './utils';
+import { calculateBacktestStats, getInitialCapital, validateStockData, calculateADX, calculateWilliamsR, calculateCCI, calculateParabolicSAR, calculateATR, calculateMA, calculateSuperTrend, calculateHeikenAshi, calculateChoppinessIndex, calculateEMA, calculateAroon, calculateForceIndex } from './utils';
 
 /**
  * モメンタム戦略のバックテスト
@@ -511,30 +511,6 @@ function calculateMACD(data: StockData[]) {
   const signalLine = calculateEMAFromArray(macdLine.filter(val => val !== null) as number[], 9);
   
   return { macdLine, signalLine };
-}
-
-/**
- * EMAの計算
- */
-function calculateEMA(data: StockData[], period: number): (number | null)[] {
-  const multiplier = 2 / (period + 1);
-  const ema: (number | null)[] = new Array(data.length).fill(null);
-  
-  if (data.length < period) return ema;
-  
-  // 初期値はSMA
-  const smaSum = data.slice(0, period).reduce((sum, item) => sum + item.close, 0);
-  ema[period - 1] = smaSum / period;
-  
-  // EMA計算
-  for (let i = period; i < data.length; i++) {
-    const prevEma = ema[i - 1];
-    if (prevEma !== null) {
-      ema[i] = (data[i].close * multiplier) + (prevEma * (1 - multiplier));
-    }
-  }
-  
-  return ema;
 }
 
 /**
@@ -1204,6 +1180,240 @@ export const runChoppinessStrategy = (data: StockData[], strategyName: string): 
     // レンジ相場になったら（CI > 61）または価格がMAを下抜けたら売り
     const isRanging = ciValue > 61;
     if ((isRanging || item.close < ma20Value) && position > 0 && item.close > 0 && entryPrice > 0) {
+      const exitPrice = item.close;
+      const profit = position * (exitPrice - entryPrice);
+      const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+      if (isFinite(profit) && isFinite(returnPct)) {
+        trades.push({
+          entryDate,
+          exitDate: item.date,
+          entryPrice,
+          exitPrice,
+          return: returnPct,
+          profit
+        });
+      }
+
+      capital += position * exitPrice;
+      position = 0;
+      entryPrice = 0;
+      entryDate = "";
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+/**
+ * Aroon指標戦略のバックテスト
+ */
+export const runAroonStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 30) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const aroon = calculateAroon(validData, 25);
+
+  validData.forEach((item, index) => {
+    if (index < 25) return;
+
+    const aroonValue = aroon[index];
+    const prevAroonValue = aroon[index - 1];
+
+    if (!aroonValue || !prevAroonValue) return;
+
+    // Aroon Up > 70 かつ Aroon Down < 30 で買い（強い上昇トレンド）
+    if (aroonValue.aroonUp > 70 && aroonValue.aroonDown < 30 && position === 0 && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        capital -= position * item.close;
+      }
+    }
+
+    // Aroon Down > 70 かつ Aroon Up < 30 で売り（強い下降トレンド）
+    // または Aroon Up と Aroon Down が交差したら売り
+    if (position > 0 && item.close > 0 && entryPrice > 0) {
+      const shouldExit = (aroonValue.aroonDown > 70 && aroonValue.aroonUp < 30) ||
+                         (prevAroonValue.aroonUp > prevAroonValue.aroonDown && aroonValue.aroonUp < aroonValue.aroonDown);
+
+      if (shouldExit) {
+        const exitPrice = item.close;
+        const profit = position * (exitPrice - entryPrice);
+        const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+        if (isFinite(profit) && isFinite(returnPct)) {
+          trades.push({
+            entryDate,
+            exitDate: item.date,
+            entryPrice,
+            exitPrice,
+            return: returnPct,
+            profit
+          });
+        }
+
+        capital += position * exitPrice;
+        position = 0;
+        entryPrice = 0;
+        entryDate = "";
+      }
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+/**
+ * Elder's Force Index戦略のバックテスト
+ */
+export const runForceIndexStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 20) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const forceIndex = calculateForceIndex(validData, 13);
+
+  validData.forEach((item, index) => {
+    if (index < 14) return;
+
+    const fiValue = forceIndex[index];
+    const prevFIValue = forceIndex[index - 1];
+
+    if (fiValue === null || prevFIValue === null || !isFinite(fiValue) || !isFinite(prevFIValue)) return;
+
+    // Force Indexがゼロラインを下から上に抜けたら買い（買い圧力）
+    if (prevFIValue <= 0 && fiValue > 0 && position === 0 && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        capital -= position * item.close;
+      }
+    }
+
+    // Force Indexがゼロラインを上から下に抜けたら売り（売り圧力）
+    if (prevFIValue >= 0 && fiValue < 0 && position > 0 && item.close > 0 && entryPrice > 0) {
+      const exitPrice = item.close;
+      const profit = position * (exitPrice - entryPrice);
+      const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+      if (isFinite(profit) && isFinite(returnPct)) {
+        trades.push({
+          entryDate,
+          exitDate: item.date,
+          entryPrice,
+          exitPrice,
+          return: returnPct,
+          profit
+        });
+      }
+
+      capital += position * exitPrice;
+      position = 0;
+      entryPrice = 0;
+      entryDate = "";
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+/**
+ * EMAリボン戦略のバックテスト
+ */
+export const runEMARibbonStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 100) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  // EMAリボン：8, 13, 21, 34, 55, 89日
+  const ema8 = calculateEMA(validData, 8);
+  const ema13 = calculateEMA(validData, 13);
+  const ema21 = calculateEMA(validData, 21);
+  const ema34 = calculateEMA(validData, 34);
+  const ema55 = calculateEMA(validData, 55);
+  const ema89 = calculateEMA(validData, 89);
+
+  validData.forEach((item, index) => {
+    if (index < 89) return;
+
+    const e8 = ema8[index];
+    const e13 = ema13[index];
+    const e21 = ema21[index];
+    const e34 = ema34[index];
+    const e55 = ema55[index];
+    const e89 = ema89[index];
+
+    if (!e8 || !e13 || !e21 || !e34 || !e55 || !e89 ||
+        !isFinite(e8) || !isFinite(e13) || !isFinite(e21) ||
+        !isFinite(e34) || !isFinite(e55) || !isFinite(e89)) return;
+
+    // 全てのEMAが正しく並んでいる（短期 > 長期）かつ価格がリボンの上にある → 買い
+    const bullishAlignment = e8 > e13 && e13 > e21 && e21 > e34 && e34 > e55 && e55 > e89;
+    const priceAboveRibbon = item.close > e8;
+
+    if (bullishAlignment && priceAboveRibbon && position === 0 && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        capital -= position * item.close;
+      }
+    }
+
+    // 価格が最短期EMAを下抜けたら売り、または順序が崩れたら売り
+    const bearishCross = item.close < e8;
+    const alignmentBroken = !(e8 > e13 && e13 > e21);
+
+    if ((bearishCross || alignmentBroken) && position > 0 && item.close > 0 && entryPrice > 0) {
       const exitPrice = item.close;
       const profit = position * (exitPrice - entryPrice);
       const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
