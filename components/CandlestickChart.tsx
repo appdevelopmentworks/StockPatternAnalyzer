@@ -90,7 +90,7 @@ export default function CandlestickChart({ data, currencySymbol }: CandlestickCh
   }
 
   // データの範囲を計算
-  const prices = data.flatMap(d => [d.high, d.low, d.open, d.close, d.ma5, d.ma20, d.ma200].filter(p => p !== null && p > 0));
+  const prices = data.flatMap(d => [d.high, d.low, d.open, d.close, d.ma5, d.ma20, d.ma200].filter((p): p is number => p !== null && p > 0));
   const minPrice = Math.min(...prices);
   const maxPrice = Math.max(...prices);
   const priceRange = maxPrice - minPrice;

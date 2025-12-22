@@ -696,7 +696,7 @@ export default function Home() {
                                 name === 'totalReturn' ? '総リターン' : '勝率'
                               ]}
                               labelFormatter={(label) => `戦略: ${label}`}
-                              content={({ active, payload, label }) => {
+                              content={({ active, payload, label }: any) => {
                                 if (active && payload && payload.length) {
                                   const data = payload[0].payload;
                                   const description = strategyDescriptions[label as string] || '戦略の説明がありません';
