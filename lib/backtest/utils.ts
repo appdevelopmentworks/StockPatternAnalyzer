@@ -593,6 +593,137 @@ export const calculateEMA = (data: any[], period: number, field: string = 'close
 };
 
 /**
+ * TRIX（トリプル指数移動平均）を計算する
+ * @param data 株価データ
+ * @param period 期間（デフォルト14日）
+ * @returns TRIX配列（パーセント表示）
+ */
+export const calculateTRIX = (data: any[], period: number = 14): (number | null)[] => {
+  const trix: (number | null)[] = new Array(data.length).fill(null);
+
+  if (data.length < period * 3) return trix;
+
+  // 第1段階：元データのEMA
+  const firstEMA = calculateEMA(data, period, 'close');
+
+  // 第2段階：第1EMAのEMA（データ形式を合わせる）
+  const firstEMAData = firstEMA.map((value, index) => ({
+    close: value ?? 0,
+    date: data[index].date
+  }));
+  const secondEMA = calculateEMA(firstEMAData, period, 'close');
+
+  // 第3段階：第2EMAのEMA（データ形式を合わせる）
+  const secondEMAData = secondEMA.map((value, index) => ({
+    close: value ?? 0,
+    date: data[index].date
+  }));
+  const thirdEMA = calculateEMA(secondEMAData, period, 'close');
+
+  // TRIXの計算：第3EMAの変化率（パーセント）
+  for (let i = 1; i < data.length; i++) {
+    if (thirdEMA[i] !== null && thirdEMA[i - 1] !== null && thirdEMA[i - 1] !== 0) {
+      const change = ((thirdEMA[i]! - thirdEMA[i - 1]!) / thirdEMA[i - 1]!) * 100;
+      trix[i] = isFinite(change) ? change : null;
+    }
+  }
+
+  return trix;
+};
+
+/**
+ * CMF（チェイキン・マネーフロー）を計算する
+ * @param data 株価データ
+ * @param period 期間（デフォルト20日）
+ * @returns CMF配列
+ */
+export const calculateCMF = (data: any[], period: number = 20): (number | null)[] => {
+  const cmf: (number | null)[] = new Array(data.length).fill(null);
+
+  if (data.length < period) return cmf;
+
+  for (let i = period - 1; i < data.length; i++) {
+    let sumMoneyFlowVolume = 0;
+    let sumVolume = 0;
+
+    for (let j = i - period + 1; j <= i; j++) {
+      const high = data[j].high;
+      const low = data[j].low;
+      const close = data[j].close;
+      const volume = data[j].volume || 0;
+
+      // マネーフロー乗数を計算
+      const range = high - low;
+      if (range === 0) continue;
+
+      const moneyFlowMultiplier = ((close - low) - (high - close)) / range;
+      const moneyFlowVolume = moneyFlowMultiplier * volume * close;
+
+      sumMoneyFlowVolume += moneyFlowVolume;
+      sumVolume += volume;
+    }
+
+    if (sumVolume > 0) {
+      cmf[i] = sumMoneyFlowVolume / sumVolume;
+    }
+  }
+
+  return cmf;
+};
+
+/**
+ * KAMA（カウフマン適応型移動平均）を計算する
+ * @param data 株価データ
+ * @param period ER計算期間（デフォルト10日）
+ * @param fastPeriod 最速期間（デフォルト2日）
+ * @param slowPeriod 最遅期間（デフォルト30日）
+ * @returns KAMA配列
+ */
+export const calculateKAMA = (
+  data: any[],
+  period: number = 10,
+  fastPeriod: number = 2,
+  slowPeriod: number = 30
+): (number | null)[] => {
+  const kama: (number | null)[] = new Array(data.length).fill(null);
+
+  if (data.length < period + 1) return kama;
+
+  // スムージング定数を計算
+  const fastestSC = 2 / (fastPeriod + 1);
+  const slowestSC = 2 / (slowPeriod + 1);
+
+  // 最初のKAMAは単純移動平均
+  let sum = 0;
+  for (let i = 0; i < period; i++) {
+    sum += data[i].close;
+  }
+  kama[period - 1] = sum / period;
+
+  // 以降のKAMA計算
+  for (let i = period; i < data.length; i++) {
+    // ER（効率比）を計算
+    const change = Math.abs(data[i].close - data[i - period].close);
+
+    let volatility = 0;
+    for (let j = i - period + 1; j <= i; j++) {
+      volatility += Math.abs(data[j].close - data[j - 1].close);
+    }
+
+    const er = volatility > 0 ? change / volatility : 0;
+
+    // スムージング定数を計算
+    const sc = Math.pow(er * (fastestSC - slowestSC) + slowestSC, 2);
+
+    // KAMAを計算
+    const prevKAMA = kama[i - 1] ?? data[i].close;
+    kama[i] = prevKAMA + sc * (data[i].close - prevKAMA);
+  }
+
+  return kama;
+};
+
+/**
  * Aroon指標を計算する
  * @param data 株価データ
  * @param period 期間（デフォルト25日）

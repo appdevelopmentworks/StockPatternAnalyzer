@@ -142,7 +142,11 @@ export default function Home() {
     "ROC（変化率）": "N期間前との価格変化率でモメンタムを測定し、ゼロラインクロスで売買する戦略",
     "MFI（マネーフローインデックス）": "RSIに出来高を加味した指標で、20以下で買い80以上で売る逆張り戦略",
     "ATRトレーリングストップ": "ATR（平均真の範囲）を使った動的トレーリングストップでトレンドフォローする戦略",
-    "ボリンジャースクイーズ": "ボラティリティ収縮後のブレイクアウトを狙う戦略、バンド幅最小時に待機しブレイクで仕掛ける"
+    "ボリンジャースクイーズ": "ボラティリティ収縮後のブレイクアウトを狙う戦略、バンド幅最小時に待機しブレイクで仕掛ける",
+    "TRIX（トリプルEMA）": "3重指数移動平均の変化率でノイズを除去、シグナルラインとのクロスオーバーで売買する順張り戦略",
+    "CMF（チェイキン・マネーフロー）": "価格と出来高から資金フローを測定、買い圧力/売り圧力を判定し機関投資家の動きに追従する戦略",
+    "タートルトレーディング": "伝説的なトレンドフォロー戦略、55日ブレイクアウトでエントリー、20日ブレイクアウトまたはATRストップで決済",
+    "KAMA（適応型移動平均）": "市場状況に応じて自動調整する適応型移動平均、トレンド時は速く反応しレンジ時は遅く反応してダマシを回避"
   };
 
   // バックテスト機能の初期化
@@ -976,7 +980,11 @@ export default function Home() {
                             r.strategy.includes("ROC（変化率）") ||
                             r.strategy.includes("MFI（マネーフローインデックス）") ||
                             r.strategy.includes("ATRトレーリングストップ") ||
-                            r.strategy.includes("ボリンジャースクイーズ")
+                            r.strategy.includes("ボリンジャースクイーズ") ||
+                            r.strategy.includes("TRIX（トリプルEMA）") ||
+                            r.strategy.includes("CMF（チェイキン・マネーフロー）") ||
+                            r.strategy.includes("タートルトレーディング") ||
+                            r.strategy.includes("KAMA（適応型移動平均）")
                           ).map((result, index) => (
                             <Card key={result.strategy} 
                                   className={`cursor-pointer transition-all hover:shadow-lg ${selectedStrategy === backtestResults.indexOf(result).toString() ? 'border-2 border-blue-500' : ''} group relative`}

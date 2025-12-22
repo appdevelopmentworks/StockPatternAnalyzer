@@ -1,5 +1,5 @@
 import { StockData, Trade, BacktestResult } from './types';
-import { calculateBacktestStats, getInitialCapital, validateStockData, calculateADX, calculateWilliamsR, calculateCCI, calculateParabolicSAR, calculateATR, calculateMA, calculateSuperTrend, calculateHeikenAshi, calculateChoppinessIndex, calculateEMA, calculateAroon, calculateForceIndex, calculatePivotPoints, calculateFibonacciLevels, calculateROC, calculateMFI, calculateATRTrailingStop, calculateBollingerBandWidth } from './utils';
+import { calculateBacktestStats, getInitialCapital, validateStockData, calculateADX, calculateWilliamsR, calculateCCI, calculateParabolicSAR, calculateATR, calculateMA, calculateSuperTrend, calculateHeikenAshi, calculateChoppinessIndex, calculateEMA, calculateAroon, calculateForceIndex, calculatePivotPoints, calculateFibonacciLevels, calculateROC, calculateMFI, calculateATRTrailingStop, calculateBollingerBandWidth, calculateTRIX, calculateCMF, calculateKAMA } from './utils';
 
 /**
  * モメンタム戦略のバックテスト
@@ -1929,6 +1929,336 @@ export const runBollingerSqueezeStrategy = (data: StockData[], strategyName: str
       const belowMiddle = item.close < currentBB.middle;
 
       if (belowMiddle || profitPct > 5 || profitPct < -3) {
+        const exitPrice = item.close;
+        const profit = position * (exitPrice - entryPrice);
+        const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+        if (isFinite(profit) && isFinite(returnPct)) {
+          trades.push({
+            entryDate,
+            exitDate: item.date,
+            entryPrice,
+            exitPrice,
+            return: returnPct,
+            profit
+          });
+        }
+
+        capital += position * exitPrice;
+        position = 0;
+        entryPrice = 0;
+        entryDate = "";
+      }
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+/**
+ * TRIX戦略のバックテスト
+ */
+export const runTRIXStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 60) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const trix = calculateTRIX(validData, 14);
+
+  // TRIXのシグナルライン（9期間EMA）を計算
+  const trixData = trix.map((value, index) => ({
+    close: value ?? 0,
+    date: validData[index].date
+  }));
+  const signalLine = calculateEMA(trixData, 9, 'close');
+
+  validData.forEach((item, index) => {
+    if (index < 50) return;
+
+    const currentTRIX = trix[index];
+    const prevTRIX = trix[index - 1];
+    const currentSignal = signalLine[index];
+    const prevSignal = signalLine[index - 1];
+
+    if (
+      currentTRIX === null ||
+      prevTRIX === null ||
+      currentSignal === null ||
+      prevSignal === null
+    ) {
+      return;
+    }
+
+    // ゴールデンクロス：TRIXがシグナルラインを上抜け
+    if (position === 0 && prevTRIX <= prevSignal && currentTRIX > currentSignal && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        capital -= position * item.close;
+      }
+    }
+
+    // デッドクロス：TRIXがシグナルラインを下抜け、または損切り・利確
+    if (position > 0 && item.close > 0 && entryPrice > 0) {
+      const profitPct = ((item.close - entryPrice) / entryPrice) * 100;
+      const deathCross = prevTRIX >= prevSignal && currentTRIX < currentSignal;
+
+      if (deathCross || profitPct > 10 || profitPct < -5) {
+        const exitPrice = item.close;
+        const profit = position * (exitPrice - entryPrice);
+        const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+        if (isFinite(profit) && isFinite(returnPct)) {
+          trades.push({
+            entryDate,
+            exitDate: item.date,
+            entryPrice,
+            exitPrice,
+            return: returnPct,
+            profit
+          });
+        }
+
+        capital += position * exitPrice;
+        position = 0;
+        entryPrice = 0;
+        entryDate = "";
+      }
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+/**
+ * CMF（チェイキン・マネーフロー）戦略のバックテスト
+ */
+export const runCMFStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 30) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const cmf = calculateCMF(validData, 20);
+  const buyThreshold = 0.05;
+  const sellThreshold = -0.05;
+
+  validData.forEach((item, index) => {
+    if (index < 20) return;
+
+    const currentCMF = cmf[index];
+    const prevCMF = cmf[index - 1];
+
+    if (currentCMF === null || prevCMF === null) return;
+
+    // 買いシグナル：CMFが閾値を上抜け（資金流入）
+    if (position === 0 && prevCMF <= buyThreshold && currentCMF > buyThreshold && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        capital -= position * item.close;
+      }
+    }
+
+    // 売りシグナル：CMFが閾値を下抜け（資金流出）、または利確・損切り
+    if (position > 0 && item.close > 0 && entryPrice > 0) {
+      const profitPct = ((item.close - entryPrice) / entryPrice) * 100;
+      const sellSignal = prevCMF >= sellThreshold && currentCMF < sellThreshold;
+
+      if (sellSignal || profitPct > 8 || profitPct < -4) {
+        const exitPrice = item.close;
+        const profit = position * (exitPrice - entryPrice);
+        const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+        if (isFinite(profit) && isFinite(returnPct)) {
+          trades.push({
+            entryDate,
+            exitDate: item.date,
+            entryPrice,
+            exitPrice,
+            return: returnPct,
+            profit
+          });
+        }
+
+        capital += position * exitPrice;
+        position = 0;
+        entryPrice = 0;
+        entryDate = "";
+      }
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+/**
+ * タートルトレーディング戦略のバックテスト（システム2: 55日ブレイクアウト）
+ */
+export const runTurtleTradingStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+  let stopLoss = 0;
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 60) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const atr = calculateATR(validData, 20);
+  const entryPeriod = 55; // システム2
+  const exitPeriod = 20;
+  const atrMultiplier = 2; // ストップロス用
+
+  validData.forEach((item, index) => {
+    if (index < entryPeriod) return;
+
+    // 過去N日間の最高値・最安値を計算
+    const entrySlice = validData.slice(index - entryPeriod, index);
+    const exitSlice = validData.slice(index - exitPeriod, index);
+
+    const entryHigh = Math.max(...entrySlice.map(d => d.high));
+    const exitLow = Math.min(...exitSlice.map(d => d.low));
+
+    const currentATR = atr[index];
+    if (!currentATR || !isFinite(currentATR)) return;
+
+    // エントリー：55日間の最高値ブレイクアウト
+    if (position === 0 && item.high > entryHigh && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        stopLoss = entryPrice - (currentATR * atrMultiplier); // ATRベースのストップロス
+        capital -= position * item.close;
+      }
+    }
+
+    // エグジット：20日間の最安値ブレイクアウト、またはストップロス
+    if (position > 0 && item.close > 0 && entryPrice > 0) {
+      const stopLossHit = item.low <= stopLoss;
+      const exitSignal = item.low < exitLow;
+
+      if (stopLossHit || exitSignal) {
+        const exitPrice = stopLossHit ? Math.max(stopLoss, item.close) : item.close;
+        const profit = position * (exitPrice - entryPrice);
+        const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+        if (isFinite(profit) && isFinite(returnPct)) {
+          trades.push({
+            entryDate,
+            exitDate: item.date,
+            entryPrice,
+            exitPrice,
+            return: returnPct,
+            profit
+          });
+        }
+
+        capital += position * exitPrice;
+        position = 0;
+        entryPrice = 0;
+        entryDate = "";
+        stopLoss = 0;
+      }
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+/**
+ * KAMA（カウフマン適応型移動平均）戦略のバックテスト
+ */
+export const runKAMAStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 40) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const kama = calculateKAMA(validData, 10, 2, 30);
+
+  validData.forEach((item, index) => {
+    if (index < 11) return;
+
+    const currentKAMA = kama[index];
+    const prevKAMA = kama[index - 1];
+    const prevClose = validData[index - 1].close;
+
+    if (currentKAMA === null || prevKAMA === null) return;
+
+    // 買いシグナル：価格がKAMAを上抜け
+    if (position === 0 && prevClose <= prevKAMA && item.close > currentKAMA && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        capital -= position * item.close;
+      }
+    }
+
+    // 売りシグナル：価格がKAMAを下抜け、または利確・損切り
+    if (position > 0 && item.close > 0 && entryPrice > 0) {
+      const profitPct = ((item.close - entryPrice) / entryPrice) * 100;
+      const sellSignal = prevClose >= prevKAMA && item.close < currentKAMA;
+
+      if (sellSignal || profitPct > 12 || profitPct < -6) {
         const exitPrice = item.close;
         const profit = position * (exitPrice - entryPrice);
         const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;

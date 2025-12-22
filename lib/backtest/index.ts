@@ -38,7 +38,11 @@ import {
   runROCStrategy,
   runMFIStrategy,
   runATRTrailingStopStrategy,
-  runBollingerSqueezeStrategy
+  runBollingerSqueezeStrategy,
+  runTRIXStrategy,
+  runCMFStrategy,
+  runTurtleTradingStrategy,
+  runKAMAStrategy
 } from './advanced-strategies';
 import {
   runCompositeStrategy,
@@ -141,6 +145,10 @@ export const runAllBacktests = (data: StockData[]): BacktestResult[] => {
     results.push(runMFIStrategy(validData, "MFI（マネーフローインデックス）"));
     results.push(runATRTrailingStopStrategy(validData, "ATRトレーリングストップ"));
     results.push(runBollingerSqueezeStrategy(validData, "ボリンジャースクイーズ"));
+    results.push(runTRIXStrategy(validData, "TRIX（トリプルEMA）"));
+    results.push(runCMFStrategy(validData, "CMF（チェイキン・マネーフロー）"));
+    results.push(runTurtleTradingStrategy(validData, "タートルトレーディング"));
+    results.push(runKAMAStrategy(validData, "KAMA（適応型移動平均）"));
 
     // 複合・特殊戦略
     console.log('複合・特殊戦略を実行中...');
