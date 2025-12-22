@@ -108,6 +108,7 @@ export default function Home() {
     "移動平均クロス(5/20)": "5日移動平均が20日移動平均を上抜け/下抜けでエントリー/エグジット",
     "RSI戦略(30/70)": "RSIが30以下で買い、70以上で売る逆張り戦略",
     "ボリンジャーバンド": "価格がボリンジャーバンドの上下限に触れた時の逆張り戦略",
+    "RCI戦略(-80/80)": "RCI(順位相関指数)が-80以下で買い、80以上で売る逆張り戦略",
     "月初買い・月末売り": "月初に買い、月末に売却する月次効果を活用した戦略",
     "モメンタム戦略": "過去10日間の価格変化率を基にトレンド方向への順張り戦略",
     "MACD戦略": "MACDラインがシグナルラインを上抜け/下抜けでエントリー/エグジット",
@@ -877,10 +878,11 @@ export default function Home() {
                       <div>
                         <h3 className="text-lg font-semibold mb-3">テクニカル戦略（基本）</h3>
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                          {backtestResults.filter(r => 
-                            r.strategy.includes("移動平均クロス") || 
-                            r.strategy.includes("RSI戦略") || 
+                          {backtestResults.filter(r =>
+                            r.strategy.includes("移動平均クロス") ||
+                            r.strategy.includes("RSI戦略") ||
                             r.strategy.includes("ボリンジャーバンド") ||
+                            r.strategy.includes("RCI戦略") ||
                             r.strategy.includes("月初買い")
                           ).map((result, index) => (
                             <Card key={result.strategy} 

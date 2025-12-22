@@ -148,11 +148,54 @@ export const getInitialCapital = (data: any[]): number => {
 };
 
 /**
+ * RCI（順位相関指数）を計算する
+ * @param data 株価データ
+ * @param period 期間（デフォルト9日）
+ * @returns RCI配列
+ */
+export const calculateRCI = (data: any[], period: number = 9): (number | null)[] => {
+  const rci: (number | null)[] = new Array(data.length).fill(null);
+
+  if (data.length < period) return rci;
+
+  for (let i = period - 1; i < data.length; i++) {
+    const slice = data.slice(i - period + 1, i + 1);
+
+    // 日付順の順位（新しい日付ほど順位が高い = 大きい数値）
+    const dateRanks = slice.map((_, index) => index + 1);
+
+    // 価格順の順位（価格が高いほど順位が高い）
+    const pricesWithIndex = slice.map((item, index) => ({ price: item.close, index }));
+    pricesWithIndex.sort((a, b) => a.price - b.price);
+
+    const priceRanks = new Array(period);
+    pricesWithIndex.forEach((item, rank) => {
+      priceRanks[item.index] = rank + 1;
+    });
+
+    // 順位差の2乗和を計算
+    let sumOfSquaredDiffs = 0;
+    for (let j = 0; j < period; j++) {
+      const diff = dateRanks[j] - priceRanks[j];
+      sumOfSquaredDiffs += diff * diff;
+    }
+
+    // RCI計算式: (1 - (6 * Σd^2) / (n * (n^2 - 1))) * 100
+    const n = period;
+    const rciValue = (1 - (6 * sumOfSquaredDiffs) / (n * (n * n - 1))) * 100;
+
+    rci[i] = isFinite(rciValue) ? rciValue : null;
+  }
+
+  return rci;
+};
+
+/**
  * データの妥当性をチェックする
  */
 export const validateStockData = (data: any[]): any[] => {
-  return data.filter(item => 
-    item.close > 0 && 
+  return data.filter(item =>
+    item.close > 0 &&
     isFinite(item.close) &&
     item.open > 0 &&
     isFinite(item.open) &&
@@ -160,7 +203,7 @@ export const validateStockData = (data: any[]): any[] => {
     isFinite(item.high) &&
     item.low > 0 &&
     isFinite(item.low) &&
-    item.date && 
+    item.date &&
     !isNaN(new Date(item.date).getTime())
   );
 };

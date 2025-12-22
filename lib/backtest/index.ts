@@ -4,10 +4,11 @@ import {
   runNDaysStrategy, 
   runMonthlyStrategy 
 } from './strategies';
-import { 
-  runMovingAverageCrossStrategy, 
+import {
+  runMovingAverageCrossStrategy,
   runRSIStrategy,
-  runBollingerBandStrategy 
+  runBollingerBandStrategy,
+  runRCIStrategy
 } from './technical-strategies';
 import {
   runMomentumStrategy,
@@ -69,6 +70,7 @@ export const runAllBacktests = (data: StockData[]): BacktestResult[] => {
     results.push(runMovingAverageCrossStrategy(validData, "移動平均クロス(5/20)"));
     results.push(runRSIStrategy(validData, "RSI戦略(30/70)"));
     results.push(runBollingerBandStrategy(validData, "ボリンジャーバンド"));
+    results.push(runRCIStrategy(validData, "RCI戦略(-80/80)"));
     
     // 高度な戦略
     console.log('高度な戦略を実行中...');
