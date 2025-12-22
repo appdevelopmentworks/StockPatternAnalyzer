@@ -298,6 +298,140 @@ export const calculateADX = (data: any[], period: number = 14): (number | null)[
 };
 
 /**
+ * ATR（平均真の範囲）を計算する
+ * @param data 株価データ
+ * @param period 期間（デフォルト14日）
+ * @returns ATR配列
+ */
+export const calculateATR = (data: any[], period: number = 14): (number | null)[] => {
+  const atr: (number | null)[] = new Array(data.length).fill(null);
+
+  if (data.length < period + 1) return atr;
+
+  const tr: number[] = new Array(data.length).fill(0);
+
+  // True Rangeを計算
+  for (let i = 1; i < data.length; i++) {
+    const high = data[i].high;
+    const low = data[i].low;
+    const prevClose = data[i - 1].close;
+
+    tr[i] = Math.max(
+      high - low,
+      Math.abs(high - prevClose),
+      Math.abs(low - prevClose)
+    );
+  }
+
+  // 最初のATRは単純平均
+  let atrValue = tr.slice(1, period + 1).reduce((a, b) => a + b, 0) / period;
+  atr[period] = atrValue;
+
+  // 以降はスムージング
+  for (let i = period + 1; i < data.length; i++) {
+    atrValue = ((atrValue * (period - 1)) + tr[i]) / period;
+    atr[i] = isFinite(atrValue) ? atrValue : null;
+  }
+
+  return atr;
+};
+
+/**
+ * CCI（商品チャンネル指数）を計算する
+ * @param data 株価データ
+ * @param period 期間（デフォルト20日）
+ * @returns CCI配列
+ */
+export const calculateCCI = (data: any[], period: number = 20): (number | null)[] => {
+  const cci: (number | null)[] = new Array(data.length).fill(null);
+
+  if (data.length < period) return cci;
+
+  for (let i = period - 1; i < data.length; i++) {
+    const slice = data.slice(i - period + 1, i + 1);
+
+    // Typical Price = (High + Low + Close) / 3
+    const typicalPrices = slice.map(d => (d.high + d.low + d.close) / 3);
+    const sma = typicalPrices.reduce((a, b) => a + b, 0) / period;
+
+    // Mean Deviation
+    const meanDeviation = typicalPrices.reduce((sum, tp) => sum + Math.abs(tp - sma), 0) / period;
+
+    const currentTP = (data[i].high + data[i].low + data[i].close) / 3;
+
+    if (meanDeviation !== 0) {
+      const cciValue = (currentTP - sma) / (0.015 * meanDeviation);
+      cci[i] = isFinite(cciValue) ? cciValue : null;
+    }
+  }
+
+  return cci;
+};
+
+/**
+ * パラボリックSARを計算する
+ * @param data 株価データ
+ * @returns SAR配列
+ */
+export const calculateParabolicSAR = (data: any[]): (number | null)[] => {
+  const sar: (number | null)[] = new Array(data.length).fill(null);
+
+  if (data.length < 2) return sar;
+
+  let isUptrend = true;
+  let af = 0.02; // Acceleration Factor
+  const maxAF = 0.2;
+  let ep = data[0].high; // Extreme Point
+  let sarValue = data[0].low;
+
+  sar[0] = sarValue;
+
+  for (let i = 1; i < data.length; i++) {
+    // SARを更新
+    sarValue = sarValue + af * (ep - sarValue);
+
+    // トレンド反転チェック
+    if (isUptrend) {
+      if (data[i].low < sarValue) {
+        isUptrend = false;
+        sarValue = ep;
+        ep = data[i].low;
+        af = 0.02;
+      } else {
+        if (data[i].high > ep) {
+          ep = data[i].high;
+          af = Math.min(af + 0.02, maxAF);
+        }
+        // SARが過去2期間のローより高くならないように調整
+        if (i >= 2) {
+          sarValue = Math.min(sarValue, data[i - 1].low, data[i - 2].low);
+        }
+      }
+    } else {
+      if (data[i].high > sarValue) {
+        isUptrend = true;
+        sarValue = ep;
+        ep = data[i].high;
+        af = 0.02;
+      } else {
+        if (data[i].low < ep) {
+          ep = data[i].low;
+          af = Math.min(af + 0.02, maxAF);
+        }
+        // SARが過去2期間のハイより低くならないように調整
+        if (i >= 2) {
+          sarValue = Math.max(sarValue, data[i - 1].high, data[i - 2].high);
+        }
+      }
+    }
+
+    sar[i] = isFinite(sarValue) ? sarValue : null;
+  }
+
+  return sar;
+};
+
+/**
  * データの妥当性をチェックする
  */
 export const validateStockData = (data: any[]): any[] => {

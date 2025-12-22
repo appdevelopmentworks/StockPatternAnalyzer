@@ -1,5 +1,5 @@
 import { StockData, Trade, BacktestResult } from './types';
-import { calculateBacktestStats, getInitialCapital, validateStockData, calculateADX, calculateWilliamsR } from './utils';
+import { calculateBacktestStats, getInitialCapital, validateStockData, calculateADX, calculateWilliamsR, calculateCCI, calculateParabolicSAR, calculateATR, calculateMA } from './utils';
 
 /**
  * モメンタム戦略のバックテスト
@@ -775,6 +775,215 @@ export const runWilliamsRStrategy = (data: StockData[], strategyName: string): B
 
     // %R > -20で売り（買われ過ぎ）
     if (wrValue > -20 && position > 0 && item.close > 0 && entryPrice > 0) {
+      const exitPrice = item.close;
+      const profit = position * (exitPrice - entryPrice);
+      const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+      if (isFinite(profit) && isFinite(returnPct)) {
+        trades.push({
+          entryDate,
+          exitDate: item.date,
+          entryPrice,
+          exitPrice,
+          return: returnPct,
+          profit
+        });
+      }
+
+      capital += position * exitPrice;
+      position = 0;
+      entryPrice = 0;
+      entryDate = "";
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+/**
+ * CCI戦略のバックテスト
+ */
+export const runCCIStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 25) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const cci = calculateCCI(validData, 20);
+
+  validData.forEach((item, index) => {
+    if (index < 20) return;
+
+    const cciValue = cci[index];
+    if (!cciValue || !isFinite(cciValue)) return;
+
+    if (cciValue < -100 && position === 0 && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        capital -= position * item.close;
+      }
+    }
+
+    if (cciValue > 100 && position > 0 && item.close > 0 && entryPrice > 0) {
+      const exitPrice = item.close;
+      const profit = position * (exitPrice - entryPrice);
+      const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+      if (isFinite(profit) && isFinite(returnPct)) {
+        trades.push({
+          entryDate,
+          exitDate: item.date,
+          entryPrice,
+          exitPrice,
+          return: returnPct,
+          profit
+        });
+      }
+
+      capital += position * exitPrice;
+      position = 0;
+      entryPrice = 0;
+      entryDate = "";
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+/**
+ * パラボリックSAR戦略のバックテスト
+ */
+export const runParabolicSARStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 10) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const sar = calculateParabolicSAR(validData);
+
+  validData.forEach((item, index) => {
+    if (index < 2) return;
+
+    const sarValue = sar[index];
+    const prevSAR = sar[index - 1];
+
+    if (!sarValue || !prevSAR || !isFinite(sarValue) || !isFinite(prevSAR)) return;
+
+    if (prevSAR > validData[index - 1].close && sarValue < item.close && position === 0 && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        capital -= position * item.close;
+      }
+    }
+
+    if (prevSAR < validData[index - 1].close && sarValue > item.close && position > 0 && item.close > 0 && entryPrice > 0) {
+      const exitPrice = item.close;
+      const profit = position * (exitPrice - entryPrice);
+      const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+      if (isFinite(profit) && isFinite(returnPct)) {
+        trades.push({
+          entryDate,
+          exitDate: item.date,
+          entryPrice,
+          exitPrice,
+          return: returnPct,
+          profit
+        });
+      }
+
+      capital += position * exitPrice;
+      position = 0;
+      entryPrice = 0;
+      entryDate = "";
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+/**
+ * ケルトナーチャネル戦略のバックテスト
+ */
+export const runKeltnerChannelStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 30) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const period = 20;
+  const multiplier = 2;
+
+  const ema = calculateMA(validData, period);
+  const atr = calculateATR(validData, period);
+
+  validData.forEach((item, index) => {
+    if (index < period) return;
+
+    const emaValue = ema[index];
+    const atrValue = atr[index];
+
+    if (!emaValue || !atrValue || !isFinite(emaValue) || !isFinite(atrValue)) return;
+
+    const upperBand = emaValue + (multiplier * atrValue);
+    const lowerBand = emaValue - (multiplier * atrValue);
+
+    if (item.close <= lowerBand && position === 0 && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        capital -= position * item.close;
+      }
+    }
+
+    if (item.close >= upperBand && position > 0 && item.close > 0 && entryPrice > 0) {
       const exitPrice = item.close;
       const profit = position * (exitPrice - entryPrice);
       const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;

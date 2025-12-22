@@ -106,9 +106,12 @@ export default function Home() {
     "10日保有": "2週間程度保有する中期投資戦略",
     "20日保有（1ヶ月）": "約1ヶ月保有する長期的なトレンド戦略",
     "移動平均クロス(5/20)": "5日移動平均が20日移動平均を上抜け/下抜けでエントリー/エグジット",
+    "移動平均クロス(10/50)": "10日移動平均が50日移動平均を上抜け/下抜けでエントリー/エグジット",
+    "移動平均クロス(20/200)": "20日移動平均が200日移動平均を上抜け/下抜けでエントリー/エグジット",
     "RSI戦略(30/70)": "RSIが30以下で買い、70以上で売る逆張り戦略",
     "ボリンジャーバンド": "価格がボリンジャーバンドの上下限に触れた時の逆張り戦略",
     "RCI戦略(-80/80)": "RCI(順位相関指数)が-80以下で買い、80以上で売る逆張り戦略",
+    "エンベロープ戦略": "移動平均の上下2.5%のバンドで逆張りする戦略",
     "月初買い・月末売り": "月初に買い、月末に売却する月次効果を活用した戦略",
     "モメンタム戦略": "過去10日間の価格変化率を基にトレンド方向への順張り戦略",
     "MACD戦略": "MACDラインがシグナルラインを上抜け/下抜けでエントリー/エグジット",
@@ -120,6 +123,9 @@ export default function Home() {
     "ADX戦略": "ADX(平均方向性指数)が25以上の強いトレンド時にのみトレードする順張り戦略",
     "ドンチャンチャネル": "過去20日間の最高値ブレイクで買い、最低値ブレイクで売るタートルトレーディング戦略",
     "ウィリアムズ%R": "ウィリアムズ%Rが-80以下で買い、-20以上で売る逆張り戦略",
+    "CCI戦略": "CCI(商品チャンネル指数)が-100以下で買い、100以上で売る逆張り戦略",
+    "パラボリックSAR": "SARがトレンド転換を示したタイミングでエントリー/エグジットする順張り戦略",
+    "ケルトナーチャネル": "ATRベースのチャネル上下限で逆張りする戦略",
     "複合戦略": "RSI、MACD、ボリンジャーバンドを組み合わせた高度な戦略",
     "季節性戦略": "\"Sell in May and Go Away\"効果を活用した季節性投資戦略",
     "一目均衡表（三役好転/三役逆転）": "転換線、基準線、雲の位置関係による三役好転/逆転戦略",
@@ -886,6 +892,7 @@ export default function Home() {
                             r.strategy.includes("RSI戦略") ||
                             r.strategy.includes("ボリンジャーバンド") ||
                             r.strategy.includes("RCI戦略") ||
+                            r.strategy.includes("エンベロープ") ||
                             r.strategy.includes("月初買い")
                           ).map((result, index) => (
                             <Card key={result.strategy} 
@@ -942,7 +949,10 @@ export default function Home() {
                             r.strategy.includes("ボラティリティー") ||
                             r.strategy.includes("ADX戦略") ||
                             r.strategy.includes("ドンチャンチャネル") ||
-                            r.strategy.includes("ウィリアムズ%R")
+                            r.strategy.includes("ウィリアムズ%R") ||
+                            r.strategy.includes("CCI戦略") ||
+                            r.strategy.includes("パラボリックSAR") ||
+                            r.strategy.includes("ケルトナーチャネル")
                           ).map((result, index) => (
                             <Card key={result.strategy} 
                                   className={`cursor-pointer transition-all hover:shadow-lg ${selectedStrategy === backtestResults.indexOf(result).toString() ? 'border-2 border-blue-500' : ''} group relative`}

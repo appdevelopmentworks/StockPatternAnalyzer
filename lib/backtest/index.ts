@@ -8,7 +8,10 @@ import {
   runMovingAverageCrossStrategy,
   runRSIStrategy,
   runBollingerBandStrategy,
-  runRCIStrategy
+  runRCIStrategy,
+  runMovingAverageCross10_50Strategy,
+  runMovingAverageCross20_200Strategy,
+  runEnvelopeStrategy
 } from './technical-strategies';
 import {
   runMomentumStrategy,
@@ -20,7 +23,10 @@ import {
   runVolatilityBreakoutStrategy,
   runADXStrategy,
   runDonchianChannelStrategy,
-  runWilliamsRStrategy
+  runWilliamsRStrategy,
+  runCCIStrategy,
+  runParabolicSARStrategy,
+  runKeltnerChannelStrategy
 } from './advanced-strategies';
 import {
   runCompositeStrategy,
@@ -71,9 +77,12 @@ export const runAllBacktests = (data: StockData[]): BacktestResult[] => {
     console.log('その他の戦略を実行中...');
     results.push(runMonthlyStrategy(validData, "月初買い・月末売り"));
     results.push(runMovingAverageCrossStrategy(validData, "移動平均クロス(5/20)"));
+    results.push(runMovingAverageCross10_50Strategy(validData, "移動平均クロス(10/50)"));
+    results.push(runMovingAverageCross20_200Strategy(validData, "移動平均クロス(20/200)"));
     results.push(runRSIStrategy(validData, "RSI戦略(30/70)"));
     results.push(runBollingerBandStrategy(validData, "ボリンジャーバンド"));
     results.push(runRCIStrategy(validData, "RCI戦略(-80/80)"));
+    results.push(runEnvelopeStrategy(validData, "エンベロープ戦略"));
     
     // 高度な戦略
     console.log('高度な戦略を実行中...');
@@ -87,6 +96,9 @@ export const runAllBacktests = (data: StockData[]): BacktestResult[] => {
     results.push(runADXStrategy(validData, "ADX戦略"));
     results.push(runDonchianChannelStrategy(validData, "ドンチャンチャネル"));
     results.push(runWilliamsRStrategy(validData, "ウィリアムズ%R"));
+    results.push(runCCIStrategy(validData, "CCI戦略"));
+    results.push(runParabolicSARStrategy(validData, "パラボリックSAR"));
+    results.push(runKeltnerChannelStrategy(validData, "ケルトナーチャネル"));
     
     // 複合・特殊戦略
     console.log('複合・特殊戦略を実行中...');
