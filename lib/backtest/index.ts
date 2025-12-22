@@ -42,7 +42,13 @@ import {
   runTRIXStrategy,
   runCMFStrategy,
   runTurtleTradingStrategy,
-  runKAMAStrategy
+  runKAMAStrategy,
+  runDMIStrategy,
+  runVolumeSpikeStrategy,
+  runDEMAStrategy,
+  runChandelierExitStrategy,
+  runTripleMAStrategy,
+  runWeeklyPivotStrategy
 } from './advanced-strategies';
 import {
   runCompositeStrategy,
@@ -149,6 +155,12 @@ export const runAllBacktests = (data: StockData[]): BacktestResult[] => {
     results.push(runCMFStrategy(validData, "CMF（チェイキン・マネーフロー）"));
     results.push(runTurtleTradingStrategy(validData, "タートルトレーディング"));
     results.push(runKAMAStrategy(validData, "KAMA（適応型移動平均）"));
+    results.push(runDMIStrategy(validData, "DMI（方向性指数）"));
+    results.push(runVolumeSpikeStrategy(validData, "出来高急増"));
+    results.push(runDEMAStrategy(validData, "DEMA（二重EMA）"));
+    results.push(runChandelierExitStrategy(validData, "シャンデリアエグジット"));
+    results.push(runTripleMAStrategy(validData, "3本移動平均"));
+    results.push(runWeeklyPivotStrategy(validData, "週次ピボットポイント"));
 
     // 複合・特殊戦略
     console.log('複合・特殊戦略を実行中...');

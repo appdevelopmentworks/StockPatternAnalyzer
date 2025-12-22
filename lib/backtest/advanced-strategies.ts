@@ -1,5 +1,5 @@
 import { StockData, Trade, BacktestResult } from './types';
-import { calculateBacktestStats, getInitialCapital, validateStockData, calculateADX, calculateWilliamsR, calculateCCI, calculateParabolicSAR, calculateATR, calculateMA, calculateSuperTrend, calculateHeikenAshi, calculateChoppinessIndex, calculateEMA, calculateAroon, calculateForceIndex, calculatePivotPoints, calculateFibonacciLevels, calculateROC, calculateMFI, calculateATRTrailingStop, calculateBollingerBandWidth, calculateTRIX, calculateCMF, calculateKAMA } from './utils';
+import { calculateBacktestStats, getInitialCapital, validateStockData, calculateADX, calculateWilliamsR, calculateCCI, calculateParabolicSAR, calculateATR, calculateMA, calculateSuperTrend, calculateHeikenAshi, calculateChoppinessIndex, calculateEMA, calculateAroon, calculateForceIndex, calculatePivotPoints, calculateFibonacciLevels, calculateROC, calculateMFI, calculateATRTrailingStop, calculateBollingerBandWidth, calculateTRIX, calculateCMF, calculateKAMA, calculateDMI, calculateDEMA, calculateVolumeRatio } from './utils';
 
 /**
  * モメンタム戦略のバックテスト
@@ -2260,6 +2260,444 @@ export const runKAMAStrategy = (data: StockData[], strategyName: string): Backte
 
       if (sellSignal || profitPct > 12 || profitPct < -6) {
         const exitPrice = item.close;
+        const profit = position * (exitPrice - entryPrice);
+        const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+        if (isFinite(profit) && isFinite(returnPct)) {
+          trades.push({
+            entryDate,
+            exitDate: item.date,
+            entryPrice,
+            exitPrice,
+            return: returnPct,
+            profit
+          });
+        }
+
+        capital += position * exitPrice;
+        position = 0;
+        entryPrice = 0;
+        entryDate = "";
+      }
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+/**
+ * DMI戦略のバックテスト
+ */
+export const runDMIStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 30) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const dmi = calculateDMI(validData, 14);
+
+  validData.forEach((item, index) => {
+    if (index < 15) return;
+
+    const currentDMI = dmi[index];
+    const prevDMI = dmi[index - 1];
+
+    if (!currentDMI || !prevDMI) return;
+
+    if (position === 0 && prevDMI.plusDI <= prevDMI.minusDI && currentDMI.plusDI > currentDMI.minusDI && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        capital -= position * item.close;
+      }
+    }
+
+    if (position > 0 && item.close > 0 && entryPrice > 0) {
+      const profitPct = ((item.close - entryPrice) / entryPrice) * 100;
+      const sellSignal = prevDMI.plusDI >= prevDMI.minusDI && currentDMI.plusDI < currentDMI.minusDI;
+
+      if (sellSignal || profitPct > 10 || profitPct < -5) {
+        const exitPrice = item.close;
+        const profit = position * (exitPrice - entryPrice);
+        const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+        if (isFinite(profit) && isFinite(returnPct)) {
+          trades.push({
+            entryDate,
+            exitDate: item.date,
+            entryPrice,
+            exitPrice,
+            return: returnPct,
+            profit
+          });
+        }
+
+        capital += position * exitPrice;
+        position = 0;
+        entryPrice = 0;
+        entryDate = "";
+      }
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+export const runVolumeSpikeStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 30) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const volumeRatio = calculateVolumeRatio(validData, 20);
+
+  validData.forEach((item, index) => {
+    if (index < 20) return;
+
+    const currentRatio = volumeRatio[index];
+    if (!currentRatio) return;
+
+    if (position === 0 && currentRatio >= 2.5 && item.close > validData[index - 1].close && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        capital -= position * item.close;
+      }
+    }
+
+    if (position > 0 && item.close > 0 && entryPrice > 0) {
+      const daysSinceEntry = index - validData.findIndex(d => d.date === entryDate);
+      const profitPct = ((item.close - entryPrice) / entryPrice) * 100;
+
+      if (daysSinceEntry >= 5 || profitPct > 8 || profitPct < -4) {
+        const exitPrice = item.close;
+        const profit = position * (exitPrice - entryPrice);
+        const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+        if (isFinite(profit) && isFinite(returnPct)) {
+          trades.push({
+            entryDate,
+            exitDate: item.date,
+            entryPrice,
+            exitPrice,
+            return: returnPct,
+            profit
+          });
+        }
+
+        capital += position * exitPrice;
+        position = 0;
+        entryPrice = 0;
+        entryDate = "";
+      }
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+export const runDEMAStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 50) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const dema = calculateDEMA(validData, 20);
+
+  validData.forEach((item, index) => {
+    if (index < 40) return;
+
+    const currentDEMA = dema[index];
+    const prevDEMA = dema[index - 1];
+    const prevClose = validData[index - 1].close;
+
+    if (currentDEMA === null || prevDEMA === null) return;
+
+    if (position === 0 && prevClose <= prevDEMA && item.close > currentDEMA && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        capital -= position * item.close;
+      }
+    }
+
+    if (position > 0 && item.close > 0 && entryPrice > 0) {
+      const profitPct = ((item.close - entryPrice) / entryPrice) * 100;
+      const sellSignal = prevClose >= prevDEMA && item.close < currentDEMA;
+
+      if (sellSignal || profitPct > 10 || profitPct < -5) {
+        const exitPrice = item.close;
+        const profit = position * (exitPrice - entryPrice);
+        const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+        if (isFinite(profit) && isFinite(returnPct)) {
+          trades.push({
+            entryDate,
+            exitDate: item.date,
+            entryPrice,
+            exitPrice,
+            return: returnPct,
+            profit
+          });
+        }
+
+        capital += position * exitPrice;
+        position = 0;
+        entryPrice = 0;
+        entryDate = "";
+      }
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+export const runChandelierExitStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+  let highestHigh = 0;
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 30) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const atr = calculateATR(validData, 22);
+  const lookback = 22;
+  const atrMultiplier = 3;
+
+  validData.forEach((item, index) => {
+    if (index < lookback) return;
+
+    const currentATR = atr[index];
+    if (!currentATR || !isFinite(currentATR)) return;
+
+    const slice = validData.slice(index - lookback, index + 1);
+    const periodHigh = Math.max(...slice.map(d => d.high));
+
+    if (position === 0 && item.high >= periodHigh && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        highestHigh = item.high;
+        capital -= position * item.close;
+      }
+    }
+
+    if (position > 0 && item.close > 0) {
+      if (item.high > highestHigh) {
+        highestHigh = item.high;
+      }
+
+      const exitLevel = highestHigh - (currentATR * atrMultiplier);
+
+      if (item.close < exitLevel || item.low < exitLevel) {
+        const exitPrice = Math.max(exitLevel, item.close);
+        const profit = position * (exitPrice - entryPrice);
+        const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+        if (isFinite(profit) && isFinite(returnPct)) {
+          trades.push({
+            entryDate,
+            exitDate: item.date,
+            entryPrice,
+            exitPrice,
+            return: returnPct,
+            profit
+          });
+        }
+
+        capital += position * exitPrice;
+        position = 0;
+        entryPrice = 0;
+        entryDate = "";
+        highestHigh = 0;
+      }
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+export const runTripleMAStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 100) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const shortMA = calculateMA(validData, 10, 'close');
+  const midMA = calculateMA(validData, 30, 'close');
+  const longMA = calculateMA(validData, 90, 'close');
+
+  validData.forEach((item, index) => {
+    if (index < 90) return;
+
+    const shortVal = shortMA[index];
+    const midVal = midMA[index];
+    const longVal = longMA[index];
+
+    if (shortVal === null || midVal === null || longVal === null) return;
+
+    if (position === 0 && shortVal > midVal && midVal > longVal && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        capital -= position * item.close;
+      }
+    }
+
+    if (position > 0 && item.close > 0 && entryPrice > 0) {
+      const profitPct = ((item.close - entryPrice) / entryPrice) * 100;
+      const alignmentBroken = !(shortVal > midVal && midVal > longVal);
+
+      if (alignmentBroken || profitPct > 15 || profitPct < -7) {
+        const exitPrice = item.close;
+        const profit = position * (exitPrice - entryPrice);
+        const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+        if (isFinite(profit) && isFinite(returnPct)) {
+          trades.push({
+            entryDate,
+            exitDate: item.date,
+            entryPrice,
+            exitPrice,
+            return: returnPct,
+            profit
+          });
+        }
+
+        capital += position * exitPrice;
+        position = 0;
+        entryPrice = 0;
+        entryDate = "";
+      }
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+export const runWeeklyPivotStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 10) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  validData.forEach((item, index) => {
+    if (index < 5) return;
+
+    const weekSlice = validData.slice(Math.max(0, index - 5), index);
+    if (weekSlice.length === 0) return;
+
+    const weekHigh = Math.max(...weekSlice.map(d => d.high));
+    const weekLow = Math.min(...weekSlice.map(d => d.low));
+    const weekClose = weekSlice[weekSlice.length - 1].close;
+
+    const pivot = (weekHigh + weekLow + weekClose) / 3;
+    const r1 = 2 * pivot - weekLow;
+    const s1 = 2 * pivot - weekHigh;
+
+    if (position === 0 && item.low <= s1 * 1.01 && item.close > s1 && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        capital -= position * item.close;
+      }
+    }
+
+    if (position > 0 && item.close > 0 && entryPrice > 0) {
+      const profitPct = ((item.close - entryPrice) / entryPrice) * 100;
+      const reachedR1 = item.high >= r1;
+
+      if (reachedR1 || profitPct < -3) {
+        const exitPrice = reachedR1 ? Math.min(r1, item.close) : item.close;
         const profit = position * (exitPrice - entryPrice);
         const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
 

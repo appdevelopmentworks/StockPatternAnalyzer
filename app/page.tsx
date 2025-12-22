@@ -146,7 +146,13 @@ export default function Home() {
     "TRIX（トリプルEMA）": "3重指数移動平均の変化率でノイズを除去、シグナルラインとのクロスオーバーで売買する順張り戦略",
     "CMF（チェイキン・マネーフロー）": "価格と出来高から資金フローを測定、買い圧力/売り圧力を判定し機関投資家の動きに追従する戦略",
     "タートルトレーディング": "伝説的なトレンドフォロー戦略、55日ブレイクアウトでエントリー、20日ブレイクアウトまたはATRストップで決済",
-    "KAMA（適応型移動平均）": "市場状況に応じて自動調整する適応型移動平均、トレンド時は速く反応しレンジ時は遅く反応してダマシを回避"
+    "KAMA（適応型移動平均）": "市場状況に応じて自動調整する適応型移動平均、トレンド時は速く反応しレンジ時は遅く反応してダマシを回避",
+    "DMI（方向性指数）": "+DIと-DIのクロスオーバーでトレンド方向を判定、ADXの派生指標でトレンドの強さも考慮",
+    "出来高急増": "通常の2.5倍以上の出来高発生時にエントリー、大口の動きや材料を検出する短期戦略",
+    "DEMA（二重EMA）": "EMAのEMAでラグを削減、通常のEMAより素早く反応しトレンド転換を早期に捉える",
+    "シャンデリアエグジット": "ATRベースのトレーリングストップ、最高値からATR×3で決済レベルを設定するトレンドフォロー戦略",
+    "3本移動平均": "短期・中期・長期MAの完全整列（10/30/90日）でトレンドの強さを判定、整列崩れで決済",
+    "週次ピボットポイント": "週単位のピボットポイント計算、サポート1付近で買いレジスタンス1で利確する逆張り戦略"
   };
 
   // バックテスト機能の初期化
@@ -984,7 +990,13 @@ export default function Home() {
                             r.strategy.includes("TRIX（トリプルEMA）") ||
                             r.strategy.includes("CMF（チェイキン・マネーフロー）") ||
                             r.strategy.includes("タートルトレーディング") ||
-                            r.strategy.includes("KAMA（適応型移動平均）")
+                            r.strategy.includes("KAMA（適応型移動平均）") ||
+                            r.strategy.includes("DMI（方向性指数）") ||
+                            r.strategy.includes("出来高急増") ||
+                            r.strategy.includes("DEMA（二重EMA）") ||
+                            r.strategy.includes("シャンデリアエグジット") ||
+                            r.strategy.includes("3本移動平均") ||
+                            r.strategy.includes("週次ピボットポイント")
                           ).map((result, index) => (
                             <Card key={result.strategy} 
                                   className={`cursor-pointer transition-all hover:shadow-lg ${selectedStrategy === backtestResults.indexOf(result).toString() ? 'border-2 border-blue-500' : ''} group relative`}

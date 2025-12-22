@@ -724,6 +724,124 @@ export const calculateKAMA = (
 };
 
 /**
+ * DMI（方向性指数）を計算する
+ * @param data 株価データ
+ * @param period 期間（デフォルト14日）
+ * @returns {plusDI, minusDI}の配列
+ */
+export const calculateDMI = (data: any[], period: number = 14): Array<{plusDI: number, minusDI: number} | null> => {
+  const dmi: Array<{plusDI: number, minusDI: number} | null> = new Array(data.length).fill(null);
+
+  if (data.length < period + 1) return dmi;
+
+  const tr: number[] = new Array(data.length).fill(0);
+  const plusDM: number[] = new Array(data.length).fill(0);
+  const minusDM: number[] = new Array(data.length).fill(0);
+
+  // True Range, +DM, -DMを計算
+  for (let i = 1; i < data.length; i++) {
+    const high = data[i].high;
+    const low = data[i].low;
+    const prevHigh = data[i - 1].high;
+    const prevLow = data[i - 1].low;
+    const prevClose = data[i - 1].close;
+
+    // True Range
+    tr[i] = Math.max(
+      high - low,
+      Math.abs(high - prevClose),
+      Math.abs(low - prevClose)
+    );
+
+    // Directional Movement
+    const upMove = high - prevHigh;
+    const downMove = prevLow - low;
+
+    if (upMove > downMove && upMove > 0) {
+      plusDM[i] = upMove;
+    }
+    if (downMove > upMove && downMove > 0) {
+      minusDM[i] = downMove;
+    }
+  }
+
+  // スムース化したTR, +DM, -DMを計算
+  let smoothTR = tr.slice(1, period + 1).reduce((a, b) => a + b, 0);
+  let smoothPlusDM = plusDM.slice(1, period + 1).reduce((a, b) => a + b, 0);
+  let smoothMinusDM = minusDM.slice(1, period + 1).reduce((a, b) => a + b, 0);
+
+  // +DIと-DIを計算
+  for (let i = period; i < data.length; i++) {
+    if (i > period) {
+      smoothTR = smoothTR - (smoothTR / period) + tr[i];
+      smoothPlusDM = smoothPlusDM - (smoothPlusDM / period) + plusDM[i];
+      smoothMinusDM = smoothMinusDM - (smoothMinusDM / period) + minusDM[i];
+    }
+
+    const plusDI = smoothTR > 0 ? (smoothPlusDM / smoothTR) * 100 : 0;
+    const minusDI = smoothTR > 0 ? (smoothMinusDM / smoothTR) * 100 : 0;
+
+    dmi[i] = { plusDI, minusDI };
+  }
+
+  return dmi;
+};
+
+/**
+ * DEMA（二重指数移動平均）を計算する
+ * @param data 株価データ
+ * @param period 期間（デフォルト20日）
+ * @returns DEMA配列
+ */
+export const calculateDEMA = (data: any[], period: number = 20): (number | null)[] => {
+  const dema: (number | null)[] = new Array(data.length).fill(null);
+
+  if (data.length < period * 2) return dema;
+
+  // 第1段階：通常のEMA
+  const firstEMA = calculateEMA(data, period, 'close');
+
+  // 第2段階：EMAのEMA
+  const firstEMAData = firstEMA.map((value, index) => ({
+    close: value ?? 0,
+    date: data[index].date
+  }));
+  const secondEMA = calculateEMA(firstEMAData, period, 'close');
+
+  // DEMA = 2 * EMA - EMA(EMA)
+  for (let i = 0; i < data.length; i++) {
+    if (firstEMA[i] !== null && secondEMA[i] !== null) {
+      dema[i] = 2 * firstEMA[i]! - secondEMA[i]!;
+    }
+  }
+
+  return dema;
+};
+
+/**
+ * 出来高の平均倍率を計算する（Volume Spike検出用）
+ * @param data 株価データ
+ * @param period 期間（デフォルト20日）
+ * @returns 出来高倍率の配列
+ */
+export const calculateVolumeRatio = (data: any[], period: number = 20): (number | null)[] => {
+  const volumeRatio: (number | null)[] = new Array(data.length).fill(null);
+
+  if (data.length < period) return volumeRatio;
+
+  for (let i = period - 1; i < data.length; i++) {
+    const slice = data.slice(i - period + 1, i);
+    const avgVolume = slice.reduce((sum, d) => sum + (d.volume || 0), 0) / (period - 1);
+
+    if (avgVolume > 0 && data[i].volume) {
+      volumeRatio[i] = data[i].volume / avgVolume;
+    }
+  }
+
+  return volumeRatio;
+};
+
+/**
  * Aroon指標を計算する
  * @param data 株価データ
  * @param period 期間（デフォルト25日）
