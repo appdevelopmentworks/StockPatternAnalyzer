@@ -17,7 +17,10 @@ import {
   runMeanReversionStrategy,
   runBreakoutStrategy,
   runGapStrategy,
-  runVolatilityBreakoutStrategy
+  runVolatilityBreakoutStrategy,
+  runADXStrategy,
+  runDonchianChannelStrategy,
+  runWilliamsRStrategy
 } from './advanced-strategies';
 import {
   runCompositeStrategy,
@@ -81,6 +84,9 @@ export const runAllBacktests = (data: StockData[]): BacktestResult[] => {
     results.push(runBreakoutStrategy(validData, "ブレイクアウト戦略"));
     results.push(runGapStrategy(validData, "ギャップ戦略"));
     results.push(runVolatilityBreakoutStrategy(validData, "ボラティリティーブレイクアウト"));
+    results.push(runADXStrategy(validData, "ADX戦略"));
+    results.push(runDonchianChannelStrategy(validData, "ドンチャンチャネル"));
+    results.push(runWilliamsRStrategy(validData, "ウィリアムズ%R"));
     
     // 複合・特殊戦略
     console.log('複合・特殊戦略を実行中...');

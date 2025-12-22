@@ -117,6 +117,9 @@ export default function Home() {
     "ブレイクアウト戦略": "過去20日間の最高値を上抜けした時の順張り戦略",
     "ギャップ戦略": "前日終値から2%以上のギャップアップ時の逆張り戦略",
     "ボラティリティーブレイクアウト": "通常の2倍以上のボラティリティ発生時の順張り戦略",
+    "ADX戦略": "ADX(平均方向性指数)が25以上の強いトレンド時にのみトレードする順張り戦略",
+    "ドンチャンチャネル": "過去20日間の最高値ブレイクで買い、最低値ブレイクで売るタートルトレーディング戦略",
+    "ウィリアムズ%R": "ウィリアムズ%Rが-80以下で買い、-20以上で売る逆張り戦略",
     "複合戦略": "RSI、MACD、ボリンジャーバンドを組み合わせた高度な戦略",
     "季節性戦略": "\"Sell in May and Go Away\"効果を活用した季節性投資戦略",
     "一目均衡表（三役好転/三役逆転）": "転換線、基準線、雲の位置関係による三役好転/逆転戦略",
@@ -929,14 +932,17 @@ export default function Home() {
                       <div>
                         <h3 className="text-lg font-semibold mb-3">高度な戦略</h3>
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                          {backtestResults.filter(r => 
-                            r.strategy.includes("モメンタム") || 
-                            r.strategy.includes("MACD") || 
+                          {backtestResults.filter(r =>
+                            r.strategy.includes("モメンタム") ||
+                            r.strategy.includes("MACD") ||
                             r.strategy.includes("ストキャスティクス") ||
                             r.strategy.includes("平均回帰") ||
                             r.strategy.includes("ブレイクアウト") ||
                             r.strategy.includes("ギャップ") ||
-                            r.strategy.includes("ボラティリティー")
+                            r.strategy.includes("ボラティリティー") ||
+                            r.strategy.includes("ADX戦略") ||
+                            r.strategy.includes("ドンチャンチャネル") ||
+                            r.strategy.includes("ウィリアムズ%R")
                           ).map((result, index) => (
                             <Card key={result.strategy} 
                                   className={`cursor-pointer transition-all hover:shadow-lg ${selectedStrategy === backtestResults.indexOf(result).toString() ? 'border-2 border-blue-500' : ''} group relative`}

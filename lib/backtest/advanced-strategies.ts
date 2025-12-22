@@ -1,5 +1,5 @@
 import { StockData, Trade, BacktestResult } from './types';
-import { calculateBacktestStats, getInitialCapital, validateStockData } from './utils';
+import { calculateBacktestStats, getInitialCapital, validateStockData, calculateADX, calculateWilliamsR } from './utils';
 
 /**
  * モメンタム戦略のバックテスト
@@ -564,17 +564,242 @@ function calculateEMAFromArray(data: number[], period: number): (number | null)[
  */
 function calculateStochastic(data: StockData[], period: number): (number | null)[] {
   const stochastic: (number | null)[] = new Array(data.length).fill(null);
-  
+
   for (let i = period - 1; i < data.length; i++) {
     const slice = data.slice(i - period + 1, i + 1);
     const highest = Math.max(...slice.map(d => d.high));
     const lowest = Math.min(...slice.map(d => d.low));
     const current = data[i].close;
-    
+
     if (highest !== lowest) {
       stochastic[i] = ((current - lowest) / (highest - lowest)) * 100;
     }
   }
-  
+
   return stochastic;
 }
+
+/**
+ * ADX戦略のバックテスト
+ * @param data 株価データ
+ * @param strategyName 戦略名
+ */
+export const runADXStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 30) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const adx = calculateADX(validData, 14);
+
+  // 簡易的なトレンド判定（価格が移動平均より上か下か）
+  const ma20: number[] = [];
+  for (let i = 0; i < validData.length; i++) {
+    if (i < 19) {
+      ma20.push(0);
+    } else {
+      const slice = validData.slice(i - 19, i + 1);
+      const avg = slice.reduce((sum, d) => sum + d.close, 0) / 20;
+      ma20.push(avg);
+    }
+  }
+
+  validData.forEach((item, index) => {
+    if (index < 28) return;
+
+    const adxValue = adx[index];
+    if (!adxValue || !isFinite(adxValue)) return;
+
+    // ADX > 25で強いトレンド
+    // 価格がMA20より上で買い、下で売り
+    if (adxValue > 25 && position === 0 && item.close > ma20[index] && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        capital -= position * item.close;
+      }
+    }
+
+    // ADX < 20または価格がMA20を下回ったら売り
+    if ((adxValue < 20 || item.close < ma20[index]) && position > 0 && item.close > 0 && entryPrice > 0) {
+      const exitPrice = item.close;
+      const profit = position * (exitPrice - entryPrice);
+      const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+      if (isFinite(profit) && isFinite(returnPct)) {
+        trades.push({
+          entryDate,
+          exitDate: item.date,
+          entryPrice,
+          exitPrice,
+          return: returnPct,
+          profit
+        });
+      }
+
+      capital += position * exitPrice;
+      position = 0;
+      entryPrice = 0;
+      entryDate = "";
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+/**
+ * ドンチャンチャネル戦略のバックテスト
+ * @param data 株価データ
+ * @param strategyName 戦略名
+ */
+export const runDonchianChannelStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 25) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const period = 20;
+
+  validData.forEach((item, index) => {
+    if (index < period) return;
+
+    // 過去20日間の最高値と最低値
+    const slice = validData.slice(index - period, index);
+    const upperChannel = Math.max(...slice.map(d => d.high));
+    const lowerChannel = Math.min(...slice.map(d => d.low));
+
+    // 上限ブレイクで買い
+    if (item.close > upperChannel && position === 0 && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        capital -= position * item.close;
+      }
+    }
+
+    // 下限ブレイクで売り
+    if (item.close < lowerChannel && position > 0 && item.close > 0 && entryPrice > 0) {
+      const exitPrice = item.close;
+      const profit = position * (exitPrice - entryPrice);
+      const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+      if (isFinite(profit) && isFinite(returnPct)) {
+        trades.push({
+          entryDate,
+          exitDate: item.date,
+          entryPrice,
+          exitPrice,
+          return: returnPct,
+          profit
+        });
+      }
+
+      capital += position * exitPrice;
+      position = 0;
+      entryPrice = 0;
+      entryDate = "";
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+/**
+ * ウィリアムズ%R戦略のバックテスト
+ * @param data 株価データ
+ * @param strategyName 戦略名
+ */
+export const runWilliamsRStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 20) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const williamsR = calculateWilliamsR(validData, 14);
+
+  validData.forEach((item, index) => {
+    if (index < 14) return;
+
+    const wrValue = williamsR[index];
+    if (!wrValue || !isFinite(wrValue)) return;
+
+    // %R < -80で買い（売られ過ぎ）
+    if (wrValue < -80 && position === 0 && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        capital -= position * item.close;
+      }
+    }
+
+    // %R > -20で売り（買われ過ぎ）
+    if (wrValue > -20 && position > 0 && item.close > 0 && entryPrice > 0) {
+      const exitPrice = item.close;
+      const profit = position * (exitPrice - entryPrice);
+      const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+      if (isFinite(profit) && isFinite(returnPct)) {
+        trades.push({
+          entryDate,
+          exitDate: item.date,
+          entryPrice,
+          exitPrice,
+          return: returnPct,
+          profit
+        });
+      }
+
+      capital += position * exitPrice;
+      position = 0;
+      entryPrice = 0;
+      entryDate = "";
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};

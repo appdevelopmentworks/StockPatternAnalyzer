@@ -191,6 +191,113 @@ export const calculateRCI = (data: any[], period: number = 9): (number | null)[]
 };
 
 /**
+ * ウィリアムズ%Rを計算する
+ * @param data 株価データ
+ * @param period 期間（デフォルト14日）
+ * @returns ウィリアムズ%R配列
+ */
+export const calculateWilliamsR = (data: any[], period: number = 14): (number | null)[] => {
+  const williamsR: (number | null)[] = new Array(data.length).fill(null);
+
+  if (data.length < period) return williamsR;
+
+  for (let i = period - 1; i < data.length; i++) {
+    const slice = data.slice(i - period + 1, i + 1);
+    const highestHigh = Math.max(...slice.map(d => d.high));
+    const lowestLow = Math.min(...slice.map(d => d.low));
+    const currentClose = data[i].close;
+
+    if (highestHigh === lowestLow) {
+      williamsR[i] = -50; // 中立値
+    } else {
+      const wr = ((highestHigh - currentClose) / (highestHigh - lowestLow)) * -100;
+      williamsR[i] = isFinite(wr) ? wr : null;
+    }
+  }
+
+  return williamsR;
+};
+
+/**
+ * ADX（平均方向性指数）を計算する
+ * @param data 株価データ
+ * @param period 期間（デフォルト14日）
+ * @returns ADX配列
+ */
+export const calculateADX = (data: any[], period: number = 14): (number | null)[] => {
+  const adx: (number | null)[] = new Array(data.length).fill(null);
+
+  if (data.length < period * 2) return adx;
+
+  // True Range (TR) を計算
+  const tr: number[] = new Array(data.length).fill(0);
+  const plusDM: number[] = new Array(data.length).fill(0);
+  const minusDM: number[] = new Array(data.length).fill(0);
+
+  for (let i = 1; i < data.length; i++) {
+    const high = data[i].high;
+    const low = data[i].low;
+    const prevHigh = data[i - 1].high;
+    const prevLow = data[i - 1].low;
+    const prevClose = data[i - 1].close;
+
+    // True Range
+    tr[i] = Math.max(
+      high - low,
+      Math.abs(high - prevClose),
+      Math.abs(low - prevClose)
+    );
+
+    // Directional Movement
+    const upMove = high - prevHigh;
+    const downMove = prevLow - low;
+
+    if (upMove > downMove && upMove > 0) {
+      plusDM[i] = upMove;
+    }
+    if (downMove > upMove && downMove > 0) {
+      minusDM[i] = downMove;
+    }
+  }
+
+  // スムージングされたTR, +DM, -DMを計算
+  let smoothedTR = tr.slice(1, period + 1).reduce((a, b) => a + b, 0);
+  let smoothedPlusDM = plusDM.slice(1, period + 1).reduce((a, b) => a + b, 0);
+  let smoothedMinusDM = minusDM.slice(1, period + 1).reduce((a, b) => a + b, 0);
+
+  const plusDI: number[] = new Array(data.length).fill(0);
+  const minusDI: number[] = new Array(data.length).fill(0);
+  const dx: number[] = new Array(data.length).fill(0);
+
+  for (let i = period; i < data.length; i++) {
+    if (i > period) {
+      smoothedTR = smoothedTR - (smoothedTR / period) + tr[i];
+      smoothedPlusDM = smoothedPlusDM - (smoothedPlusDM / period) + plusDM[i];
+      smoothedMinusDM = smoothedMinusDM - (smoothedMinusDM / period) + minusDM[i];
+    }
+
+    plusDI[i] = smoothedTR > 0 ? (smoothedPlusDM / smoothedTR) * 100 : 0;
+    minusDI[i] = smoothedTR > 0 ? (smoothedMinusDM / smoothedTR) * 100 : 0;
+
+    const diSum = plusDI[i] + minusDI[i];
+    if (diSum > 0) {
+      dx[i] = (Math.abs(plusDI[i] - minusDI[i]) / diSum) * 100;
+    }
+  }
+
+  // ADXを計算（DXの移動平均）
+  let adxValue = dx.slice(period, period * 2).reduce((a, b) => a + b, 0) / period;
+  adx[period * 2 - 1] = adxValue;
+
+  for (let i = period * 2; i < data.length; i++) {
+    adxValue = ((adxValue * (period - 1)) + dx[i]) / period;
+    adx[i] = isFinite(adxValue) ? adxValue : null;
+  }
+
+  return adx;
+};
+
+/**
  * データの妥当性をチェックする
  */
 export const validateStockData = (data: any[]): any[] => {
