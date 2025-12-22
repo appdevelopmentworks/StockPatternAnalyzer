@@ -26,7 +26,10 @@ import {
   runWilliamsRStrategy,
   runCCIStrategy,
   runParabolicSARStrategy,
-  runKeltnerChannelStrategy
+  runKeltnerChannelStrategy,
+  runSuperTrendStrategy,
+  runHeikenAshiStrategy,
+  runChoppinessStrategy
 } from './advanced-strategies';
 import {
   runCompositeStrategy,
@@ -99,7 +102,10 @@ export const runAllBacktests = (data: StockData[]): BacktestResult[] => {
     results.push(runCCIStrategy(validData, "CCI戦略"));
     results.push(runParabolicSARStrategy(validData, "パラボリックSAR"));
     results.push(runKeltnerChannelStrategy(validData, "ケルトナーチャネル"));
-    
+    results.push(runSuperTrendStrategy(validData, "スーパートレンド"));
+    results.push(runHeikenAshiStrategy(validData, "平均足"));
+    results.push(runChoppinessStrategy(validData, "チョピネス指数"));
+
     // 複合・特殊戦略
     console.log('複合・特殊戦略を実行中...');
     results.push(runCompositeStrategy(validData, "複合戦略"));

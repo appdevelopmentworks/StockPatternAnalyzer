@@ -1,5 +1,5 @@
 import { StockData, Trade, BacktestResult } from './types';
-import { calculateBacktestStats, getInitialCapital, validateStockData, calculateADX, calculateWilliamsR, calculateCCI, calculateParabolicSAR, calculateATR, calculateMA } from './utils';
+import { calculateBacktestStats, getInitialCapital, validateStockData, calculateADX, calculateWilliamsR, calculateCCI, calculateParabolicSAR, calculateATR, calculateMA, calculateSuperTrend, calculateHeikenAshi, calculateChoppinessIndex } from './utils';
 
 /**
  * モメンタム戦略のバックテスト
@@ -984,6 +984,226 @@ export const runKeltnerChannelStrategy = (data: StockData[], strategyName: strin
     }
 
     if (item.close >= upperBand && position > 0 && item.close > 0 && entryPrice > 0) {
+      const exitPrice = item.close;
+      const profit = position * (exitPrice - entryPrice);
+      const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+      if (isFinite(profit) && isFinite(returnPct)) {
+        trades.push({
+          entryDate,
+          exitDate: item.date,
+          entryPrice,
+          exitPrice,
+          return: returnPct,
+          profit
+        });
+      }
+
+      capital += position * exitPrice;
+      position = 0;
+      entryPrice = 0;
+      entryDate = "";
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+/**
+ * スーパートレンド戦略のバックテスト
+ */
+export const runSuperTrendStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 15) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const superTrend = calculateSuperTrend(validData, 10, 3);
+
+  validData.forEach((item, index) => {
+    if (index < 11) return;
+
+    const stValue = superTrend[index];
+    const prevSTValue = superTrend[index - 1];
+
+    if (!stValue || !prevSTValue || !isFinite(stValue) || !isFinite(prevSTValue)) return;
+
+    // トレンド転換：下降→上昇で買い
+    if (prevSTValue < 0 && stValue > 0 && position === 0 && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        capital -= position * item.close;
+      }
+    }
+
+    // トレンド転換：上昇→下降で売り
+    if (prevSTValue > 0 && stValue < 0 && position > 0 && item.close > 0 && entryPrice > 0) {
+      const exitPrice = item.close;
+      const profit = position * (exitPrice - entryPrice);
+      const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+      if (isFinite(profit) && isFinite(returnPct)) {
+        trades.push({
+          entryDate,
+          exitDate: item.date,
+          entryPrice,
+          exitPrice,
+          return: returnPct,
+          profit
+        });
+      }
+
+      capital += position * exitPrice;
+      position = 0;
+      entryPrice = 0;
+      entryDate = "";
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+/**
+ * 平均足戦略のバックテスト
+ */
+export const runHeikenAshiStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 5) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const ha = calculateHeikenAshi(validData);
+
+  validData.forEach((item, index) => {
+    if (index < 2) return;
+
+    const currentHA = ha[index];
+    const prevHA = ha[index - 1];
+
+    if (!currentHA || !prevHA) return;
+
+    // 連続陽線（上昇トレンド）で買い
+    const isBullish = currentHA.close > currentHA.open;
+    const wasBullish = prevHA.close > prevHA.open;
+
+    // 陰線から陽線に転換で買い
+    if (!wasBullish && isBullish && position === 0 && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        capital -= position * item.close;
+      }
+    }
+
+    // 陽線から陰線に転換で売り
+    if (wasBullish && !isBullish && position > 0 && item.close > 0 && entryPrice > 0) {
+      const exitPrice = item.close;
+      const profit = position * (exitPrice - entryPrice);
+      const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+      if (isFinite(profit) && isFinite(returnPct)) {
+        trades.push({
+          entryDate,
+          exitDate: item.date,
+          entryPrice,
+          exitPrice,
+          return: returnPct,
+          profit
+        });
+      }
+
+      capital += position * exitPrice;
+      position = 0;
+      entryPrice = 0;
+      entryDate = "";
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+/**
+ * チョピネス指数＋トレンドフォロー戦略のバックテスト
+ */
+export const runChoppinessStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 25) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const ci = calculateChoppinessIndex(validData, 14);
+  const ma20 = calculateMA(validData, 20);
+
+  validData.forEach((item, index) => {
+    if (index < 20) return;
+
+    const ciValue = ci[index];
+    const ma20Value = ma20[index];
+    const prevMA = ma20[index - 1];
+
+    if (!ciValue || !ma20Value || !prevMA || !isFinite(ciValue) || !isFinite(ma20Value) || !isFinite(prevMA)) return;
+
+    // チョピネス指数が38以下（トレンド相場）の時のみトレード
+    const isTrending = ciValue < 38;
+
+    // トレンド相場で価格がMAを上抜けたら買い
+    if (isTrending && item.close > ma20Value && validData[index - 1].close <= prevMA && position === 0 && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        capital -= position * item.close;
+      }
+    }
+
+    // レンジ相場になったら（CI > 61）または価格がMAを下抜けたら売り
+    const isRanging = ciValue > 61;
+    if ((isRanging || item.close < ma20Value) && position > 0 && item.close > 0 && entryPrice > 0) {
       const exitPrice = item.close;
       const profit = position * (exitPrice - entryPrice);
       const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;

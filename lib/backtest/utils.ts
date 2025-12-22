@@ -432,6 +432,137 @@ export const calculateParabolicSAR = (data: any[]): (number | null)[] => {
 };
 
 /**
+ * スーパートレンドを計算する
+ * @param data 株価データ
+ * @param period ATR期間（デフォルト10日）
+ * @param multiplier 乗数（デフォルト3）
+ * @returns スーパートレンド配列（上昇トレンドなら正、下降なら負）
+ */
+export const calculateSuperTrend = (data: any[], period: number = 10, multiplier: number = 3): (number | null)[] => {
+  const superTrend: (number | null)[] = new Array(data.length).fill(null);
+
+  if (data.length < period + 1) return superTrend;
+
+  const atr = calculateATR(data, period);
+  let trend = 1; // 1: 上昇トレンド, -1: 下降トレンド
+  let upperBand = 0;
+  let lowerBand = 0;
+
+  for (let i = period; i < data.length; i++) {
+    const atrValue = atr[i];
+    if (!atrValue || !isFinite(atrValue)) continue;
+
+    const hl2 = (data[i].high + data[i].low) / 2;
+    const basicUpperBand = hl2 + (multiplier * atrValue);
+    const basicLowerBand = hl2 - (multiplier * atrValue);
+
+    // Final Bandsの計算
+    if (i === period) {
+      upperBand = basicUpperBand;
+      lowerBand = basicLowerBand;
+    } else {
+      upperBand = basicUpperBand < upperBand || data[i - 1].close > upperBand ? basicUpperBand : upperBand;
+      lowerBand = basicLowerBand > lowerBand || data[i - 1].close < lowerBand ? basicLowerBand : lowerBand;
+    }
+
+    // トレンド判定
+    if (trend === 1) {
+      if (data[i].close <= lowerBand) {
+        trend = -1;
+        superTrend[i] = upperBand;
+      } else {
+        superTrend[i] = lowerBand;
+      }
+    } else {
+      if (data[i].close >= upperBand) {
+        trend = 1;
+        superTrend[i] = lowerBand;
+      } else {
+        superTrend[i] = upperBand;
+      }
+    }
+
+    // トレンド方向を符号で表現（正：上昇、負：下降）
+    superTrend[i] = trend === 1 ? superTrend[i]! : -superTrend[i]!;
+  }
+
+  return superTrend;
+};
+
+/**
+ * 平均足（Heiken Ashi）を計算する
+ * @param data 株価データ
+ * @returns 平均足データ配列
+ */
+export const calculateHeikenAshi = (data: any[]): Array<{open: number, high: number, low: number, close: number} | null> => {
+  const ha: Array<{open: number, high: number, low: number, close: number} | null> = new Array(data.length).fill(null);
+
+  if (data.length === 0) return ha;
+
+  for (let i = 0; i < data.length; i++) {
+    const haClose = (data[i].open + data[i].high + data[i].low + data[i].close) / 4;
+
+    let haOpen: number;
+    if (i === 0) {
+      haOpen = (data[i].open + data[i].close) / 2;
+    } else {
+      haOpen = (ha[i - 1]!.open + ha[i - 1]!.close) / 2;
+    }
+
+    const haHigh = Math.max(data[i].high, haOpen, haClose);
+    const haLow = Math.min(data[i].low, haOpen, haClose);
+
+    ha[i] = {
+      open: haOpen,
+      high: haHigh,
+      low: haLow,
+      close: haClose
+    };
+  }
+
+  return ha;
+};
+
+/**
+ * チョピネス指数を計算する
+ * @param data 株価データ
+ * @param period 期間（デフォルト14日）
+ * @returns チョピネス指数配列（0-100、低い値＝トレンド、高い値＝レンジ）
+ */
+export const calculateChoppinessIndex = (data: any[], period: number = 14): (number | null)[] => {
+  const ci: (number | null)[] = new Array(data.length).fill(null);
+
+  if (data.length < period) return ci;
+
+  const atr = calculateATR(data, period);
+
+  for (let i = period - 1; i < data.length; i++) {
+    const slice = data.slice(i - period + 1, i + 1);
+
+    // ATRの合計
+    let sumATR = 0;
+    for (let j = i - period + 1; j <= i; j++) {
+      if (atr[j] && isFinite(atr[j]!)) {
+        sumATR += atr[j]!;
+      }
+    }
+
+    // 期間内の最高値と最低値
+    const highestHigh = Math.max(...slice.map(d => d.high));
+    const lowestLow = Math.min(...slice.map(d => d.low));
+
+    const range = highestHigh - lowestLow;
+
+    if (range > 0 && sumATR > 0) {
+      const ciValue = 100 * Math.log10(sumATR / range) / Math.log10(period);
+      ci[i] = isFinite(ciValue) ? ciValue : null;
+    }
+  }
+
+  return ci;
+};
+
+/**
  * データの妥当性をチェックする
  */
 export const validateStockData = (data: any[]): any[] => {
