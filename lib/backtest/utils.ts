@@ -815,6 +815,158 @@ export const calculateROC = (data: any[], period: number = 12): (number | null)[
 };
 
 /**
+ * MFI（マネーフローインデックス）を計算する
+ * @param data 株価データ
+ * @param period 期間（デフォルト14日）
+ * @returns MFI配列
+ */
+export const calculateMFI = (data: any[], period: number = 14): (number | null)[] => {
+  const mfi: (number | null)[] = new Array(data.length).fill(null);
+
+  if (data.length < period + 1) return mfi;
+
+  for (let i = period; i < data.length; i++) {
+    let positiveMoneyFlow = 0;
+    let negativeMoneyFlow = 0;
+
+    for (let j = i - period + 1; j <= i; j++) {
+      // Typical Price = (High + Low + Close) / 3
+      const typicalPrice = (data[j].high + data[j].low + data[j].close) / 3;
+      const moneyFlow = typicalPrice * data[j].volume;
+
+      if (j > i - period + 1) {
+        const prevTypicalPrice = (data[j - 1].high + data[j - 1].low + data[j - 1].close) / 3;
+
+        if (typicalPrice > prevTypicalPrice) {
+          positiveMoneyFlow += moneyFlow;
+        } else if (typicalPrice < prevTypicalPrice) {
+          negativeMoneyFlow += moneyFlow;
+        }
+      }
+    }
+
+    if (negativeMoneyFlow === 0) {
+      mfi[i] = 100;
+    } else {
+      const moneyFlowRatio = positiveMoneyFlow / negativeMoneyFlow;
+      const mfiValue = 100 - (100 / (1 + moneyFlowRatio));
+      mfi[i] = isFinite(mfiValue) ? mfiValue : null;
+    }
+  }
+
+  return mfi;
+};
+
+/**
+ * ATRトレーリングストップを計算する
+ * @param data 株価データ
+ * @param period ATR期間（デフォルト14日）
+ * @param multiplier ATR乗数（デフォルト3）
+ * @returns トレーリングストップ配列（正：ロング、負：ショート）
+ */
+export const calculateATRTrailingStop = (data: any[], period: number = 14, multiplier: number = 3): (number | null)[] => {
+  const trailingStop: (number | null)[] = new Array(data.length).fill(null);
+
+  if (data.length < period + 1) return trailingStop;
+
+  const atr = calculateATR(data, period);
+  let trend = 1; // 1: ロング, -1: ショート
+  let stop = 0;
+
+  for (let i = period; i < data.length; i++) {
+    const atrValue = atr[i];
+    if (!atrValue || !isFinite(atrValue)) continue;
+
+    const longStop = data[i].close - (atrValue * multiplier);
+    const shortStop = data[i].close + (atrValue * multiplier);
+
+    if (i === period) {
+      stop = longStop;
+      trend = 1;
+    } else {
+      const prevStop = trailingStop[i - 1];
+      if (!prevStop) continue;
+
+      if (trend === 1) {
+        // ロングトレンド
+        stop = Math.max(longStop, Math.abs(prevStop));
+        if (data[i].close < stop) {
+          trend = -1;
+          stop = shortStop;
+        }
+      } else {
+        // ショートトレンド
+        stop = Math.min(shortStop, Math.abs(prevStop));
+        if (data[i].close > stop) {
+          trend = 1;
+          stop = longStop;
+        }
+      }
+    }
+
+    trailingStop[i] = trend === 1 ? stop : -stop;
+  }
+
+  return trailingStop;
+};
+
+/**
+ * ボリンジャーバンド幅を計算する
+ * @param data 株価データ
+ * @param period 期間（デフォルト20日）
+ * @param stdDev 標準偏差倍率（デフォルト2）
+ * @returns {width: number, upper: number, middle: number, lower: number}の配列
+ */
+export const calculateBollingerBandWidth = (data: any[], period: number = 20, stdDev: number = 2): Array<{
+  width: number,
+  upper: number,
+  middle: number,
+  lower: number,
+  percentB: number
+} | null> => {
+  const bbWidth: Array<{
+    width: number,
+    upper: number,
+    middle: number,
+    lower: number,
+    percentB: number
+  } | null> = new Array(data.length).fill(null);
+
+  if (data.length < period) return bbWidth;
+
+  for (let i = period - 1; i < data.length; i++) {
+    const slice = data.slice(i - period + 1, i + 1);
+    const prices = slice.map((d: any) => d.close);
+
+    // 移動平均（ミドルバンド）
+    const middle = prices.reduce((sum: number, price: number) => sum + price, 0) / period;
+
+    // 標準偏差
+    const variance = prices.reduce((sum: number, price: number) => sum + Math.pow(price - middle, 2), 0) / period;
+    const sd = Math.sqrt(variance);
+
+    const upper = middle + (stdDev * sd);
+    const lower = middle - (stdDev * sd);
+
+    // バンド幅 = (上限 - 下限) / 中央
+    const width = middle > 0 ? ((upper - lower) / middle) * 100 : 0;
+
+    // %B = (価格 - 下限) / (上限 - 下限)
+    const percentB = (upper - lower) > 0 ? ((data[i].close - lower) / (upper - lower)) * 100 : 50;
+
+    bbWidth[i] = {
+      width: isFinite(width) ? width : 0,
+      upper: isFinite(upper) ? upper : 0,
+      middle: isFinite(middle) ? middle : 0,
+      lower: isFinite(lower) ? lower : 0,
+      percentB: isFinite(percentB) ? percentB : 50
+    };
+  }
+
+  return bbWidth;
+};
+
+/**
  * データの妥当性をチェックする
  */
 export const validateStockData = (data: any[]): any[] => {

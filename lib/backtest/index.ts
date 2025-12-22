@@ -35,7 +35,10 @@ import {
   runEMARibbonStrategy,
   runPivotPointStrategy,
   runFibonacciStrategy,
-  runROCStrategy
+  runROCStrategy,
+  runMFIStrategy,
+  runATRTrailingStopStrategy,
+  runBollingerSqueezeStrategy
 } from './advanced-strategies';
 import {
   runCompositeStrategy,
@@ -135,6 +138,9 @@ export const runAllBacktests = (data: StockData[]): BacktestResult[] => {
     results.push(runPivotPointStrategy(validData, "ピボットポイント"));
     results.push(runFibonacciStrategy(validData, "フィボナッチリトレースメント"));
     results.push(runROCStrategy(validData, "ROC（変化率）"));
+    results.push(runMFIStrategy(validData, "MFI（マネーフローインデックス）"));
+    results.push(runATRTrailingStopStrategy(validData, "ATRトレーリングストップ"));
+    results.push(runBollingerSqueezeStrategy(validData, "ボリンジャースクイーズ"));
 
     // 複合・特殊戦略
     console.log('複合・特殊戦略を実行中...');

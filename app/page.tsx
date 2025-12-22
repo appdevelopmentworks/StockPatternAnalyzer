@@ -73,7 +73,7 @@ const popularTickers = [
 
 export default function Home() {
   const [ticker, setTicker] = useState("AAPL");
-  const [period, setPeriod] = useState("10y");
+  const [period, setPeriod] = useState("5y");
   const [loading, setLoading] = useState(false);
   const [stockData, setStockData] = useState<StockData[]>([]);
   const [stats, setStats] = useState<StockStats | null>(null);
@@ -139,7 +139,10 @@ export default function Home() {
     "EMAリボン戦略": "複数のEMA(8,13,21,34,55,89日)の整列状態でトレンドの強さを判定する戦略",
     "ピボットポイント": "前日のOHLCから算出したサポート/レジスタンスレベルで売買する戦略",
     "フィボナッチリトレースメント": "スイング高値・安値からフィボナッチ比率（61.8%等）の反転ポイントで売買する戦略",
-    "ROC（変化率）": "N期間前との価格変化率でモメンタムを測定し、ゼロラインクロスで売買する戦略"
+    "ROC（変化率）": "N期間前との価格変化率でモメンタムを測定し、ゼロラインクロスで売買する戦略",
+    "MFI（マネーフローインデックス）": "RSIに出来高を加味した指標で、20以下で買い80以上で売る逆張り戦略",
+    "ATRトレーリングストップ": "ATR（平均真の範囲）を使った動的トレーリングストップでトレンドフォローする戦略",
+    "ボリンジャースクイーズ": "ボラティリティ収縮後のブレイクアウトを狙う戦略、バンド幅最小時に待機しブレイクで仕掛ける"
   };
 
   // バックテスト機能の初期化
@@ -970,7 +973,10 @@ export default function Home() {
                             r.strategy.includes("EMAリボン戦略") ||
                             r.strategy.includes("ピボットポイント") ||
                             r.strategy.includes("フィボナッチリトレースメント") ||
-                            r.strategy.includes("ROC（変化率）")
+                            r.strategy.includes("ROC（変化率）") ||
+                            r.strategy.includes("MFI（マネーフローインデックス）") ||
+                            r.strategy.includes("ATRトレーリングストップ") ||
+                            r.strategy.includes("ボリンジャースクイーズ")
                           ).map((result, index) => (
                             <Card key={result.strategy} 
                                   className={`cursor-pointer transition-all hover:shadow-lg ${selectedStrategy === backtestResults.indexOf(result).toString() ? 'border-2 border-blue-500' : ''} group relative`}

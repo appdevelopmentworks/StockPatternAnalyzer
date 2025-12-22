@@ -97,7 +97,17 @@ The backtesting system is modular and organized by strategy complexity:
 
 ## Adding New Trading Strategies
 
-To add a new strategy:
+To add a new strategy, follow these steps **in order**:
+
+### Step 1: Add Technical Indicator Calculation (if needed)
+
+If your strategy requires a new technical indicator:
+- Add the calculation function to `lib/backtest/utils.ts`
+- Follow the pattern: `export const calculateYourIndicator = (data: any[], period: number): (number | null)[] => { ... }`
+- Return an array with the same length as input data, using `null` for insufficient data points
+- Validate all values with `isFinite()` checks
+
+### Step 2: Implement Strategy Function
 
 1. Determine complexity level and choose the appropriate file:
    - Simple patterns → `lib/backtest/strategies.ts`
@@ -111,17 +121,109 @@ export const runYourStrategy = (
   data: StockData[],
   strategyName: string
 ): BacktestResult => {
-  // Implementation using utils from lib/backtest/utils.ts
-  // Must return BacktestResult with all required fields
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < MINIMUM_REQUIRED_DATA) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  // Your strategy logic here
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
 }
 ```
 
-3. Add to `lib/backtest/index.ts`:
-   - Import the function
-   - Add to `runAllBacktests()` results array
-   - Optionally add to `runSingleBacktest()` switch case
+### Step 3: Register Strategy in Backtest Engine
 
-4. Add strategy description to `app/page.tsx` in `strategyDescriptions` object (Japanese).
+Add to `lib/backtest/index.ts`:
+
+1. **Import the function** at the top of the file
+2. **Add to `runAllBacktests()`** results array with a meaningful Japanese name
+3. (Optional) Add to `runSingleBacktest()` switch case if needed
+
+```typescript
+// Example:
+results.push(runYourStrategy(validData, "あなたの戦略"));
+```
+
+### Step 4: Add UI Description
+
+Add strategy description to `app/page.tsx` in the `strategyDescriptions` object:
+
+```typescript
+const strategyDescriptions: { [key: string]: string } = {
+  // ... existing strategies
+  "あなたの戦略": "戦略の簡潔な説明（日本語）",
+};
+```
+
+### Step 5: ⚠️ **CRITICAL** - Add to UI Filter
+
+**This step is commonly forgotten but essential!** If you skip this, your strategy will execute but won't display as a card in the UI.
+
+In `app/page.tsx`, find the appropriate strategy category section and add your strategy name to the filter:
+
+```typescript
+// For advanced strategies (高度な戦略):
+{backtestResults.filter(r =>
+  r.strategy.includes("モメンタム") ||
+  r.strategy.includes("MACD") ||
+  // ... existing strategies
+  r.strategy.includes("あなたの戦略") ||  // ← ADD YOUR STRATEGY HERE
+  r.strategy.includes("他の戦略")
+).map((result, index) => (
+```
+
+**Common UI Filter Locations**:
+- **曜日戦略** (Weekday strategies): Filter contains `"曜日"`
+- **N日保有戦略** (N-day hold): Filter contains `"日保有"`
+- **テクニカル戦略（基本）** (Basic technical): Filter contains specific indicator names
+- **高度な戦略** (Advanced strategies): Filter contains advanced indicator names (~line 951)
+- **複合・特殊戦略** (Composite strategies): Filter contains composite strategy names
+
+### Step 6: Verify Implementation
+
+After adding the strategy:
+
+1. **Run type check**: `npm run type-check` or `npx tsc --noEmit`
+2. **Start dev server**: `npm run dev`
+3. **Test with real data**: Select a ticker and verify:
+   - Strategy appears in dropdown list
+   - Strategy card displays in the correct category
+   - Clicking the card shows trade details
+   - Console shows execution logs (if you added debug logging)
+4. **Check for edge cases**:
+   - Small datasets (< 20 data points)
+   - Volatile stocks
+   - Sideways/ranging markets
+   - Stocks with zero trades generated
+
+### Common Mistakes to Avoid
+
+❌ **Forgetting to add strategy to UI filter** → Strategy executes but doesn't display
+❌ **Inconsistent strategy names** → Filter won't match, card won't show
+❌ **Not validating data** → Crashes on invalid/null values
+❌ **Not handling zero trades** → Returns undefined instead of valid BacktestResult
+❌ **Incorrect Japanese naming** → UI looks inconsistent
+❌ **Missing isFinite() checks** → NaN values break calculations and filtering
+
+### Debug Checklist
+
+If a strategy doesn't display:
+
+1. ✅ Check browser console for execution logs
+2. ✅ Verify strategy name exactly matches between `index.ts` and UI filter
+3. ✅ Confirm strategy returns valid `BacktestResult` with finite values
+4. ✅ Check that `totalTrades >= 0` (negative values are filtered out)
+5. ✅ Verify the UI filter includes your strategy name (most common issue)
+6. ✅ Look for TypeScript errors in terminal/console
 
 ## Important Patterns
 

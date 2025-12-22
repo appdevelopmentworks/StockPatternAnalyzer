@@ -1,5 +1,5 @@
 import { StockData, Trade, BacktestResult } from './types';
-import { calculateBacktestStats, getInitialCapital, validateStockData, calculateADX, calculateWilliamsR, calculateCCI, calculateParabolicSAR, calculateATR, calculateMA, calculateSuperTrend, calculateHeikenAshi, calculateChoppinessIndex, calculateEMA, calculateAroon, calculateForceIndex, calculatePivotPoints, calculateFibonacciLevels, calculateROC } from './utils';
+import { calculateBacktestStats, getInitialCapital, validateStockData, calculateADX, calculateWilliamsR, calculateCCI, calculateParabolicSAR, calculateATR, calculateMA, calculateSuperTrend, calculateHeikenAshi, calculateChoppinessIndex, calculateEMA, calculateAroon, calculateForceIndex, calculatePivotPoints, calculateFibonacciLevels, calculateROC, calculateMFI, calculateATRTrailingStop, calculateBollingerBandWidth } from './utils';
 
 /**
  * モメンタム戦略のバックテスト
@@ -1702,6 +1702,233 @@ export const runROCStrategy = (data: StockData[], strategyName: string): Backtes
     // または過熱感（ROC > 8%）で利確
     if ((prevROCValue >= 0 && rocValue < 0) || rocValue > 8) {
       if (position > 0 && item.close > 0 && entryPrice > 0) {
+        const exitPrice = item.close;
+        const profit = position * (exitPrice - entryPrice);
+        const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+        if (isFinite(profit) && isFinite(returnPct)) {
+          trades.push({
+            entryDate,
+            exitDate: item.date,
+            entryPrice,
+            exitPrice,
+            return: returnPct,
+            profit
+          });
+        }
+
+        capital += position * exitPrice;
+        position = 0;
+        entryPrice = 0;
+        entryDate = "";
+      }
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+/**
+ * MFI（マネーフローインデックス）戦略のバックテスト
+ */
+export const runMFIStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 20) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const mfi = calculateMFI(validData, 14);
+
+  validData.forEach((item, index) => {
+    if (index < 14) return;
+
+    const mfiValue = mfi[index];
+    if (!mfiValue || !isFinite(mfiValue)) return;
+
+    // MFI < 20で買い（売られ過ぎ）
+    if (mfiValue < 20 && position === 0 && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        capital -= position * item.close;
+      }
+    }
+
+    // MFI > 80で売り（買われ過ぎ）
+    if (mfiValue > 80 && position > 0 && item.close > 0 && entryPrice > 0) {
+      const exitPrice = item.close;
+      const profit = position * (exitPrice - entryPrice);
+      const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+      if (isFinite(profit) && isFinite(returnPct)) {
+        trades.push({
+          entryDate,
+          exitDate: item.date,
+          entryPrice,
+          exitPrice,
+          return: returnPct,
+          profit
+        });
+      }
+
+      capital += position * exitPrice;
+      position = 0;
+      entryPrice = 0;
+      entryDate = "";
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+/**
+ * ATRトレーリングストップ戦略のバックテスト
+ */
+export const runATRTrailingStopStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 20) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const trailingStop = calculateATRTrailingStop(validData, 14, 3);
+
+  validData.forEach((item, index) => {
+    if (index < 15) return;
+
+    const stopValue = trailingStop[index];
+    const prevStopValue = trailingStop[index - 1];
+
+    if (!stopValue || !prevStopValue || !isFinite(stopValue) || !isFinite(prevStopValue)) return;
+
+    // ストップが正（ロングトレンド）に転換したら買い
+    if (prevStopValue < 0 && stopValue > 0 && position === 0 && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        capital -= position * item.close;
+      }
+    }
+
+    // ストップが負（ショートトレンド）に転換したら売り
+    if (prevStopValue > 0 && stopValue < 0 && position > 0 && item.close > 0 && entryPrice > 0) {
+      const exitPrice = item.close;
+      const profit = position * (exitPrice - entryPrice);
+      const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+      if (isFinite(profit) && isFinite(returnPct)) {
+        trades.push({
+          entryDate,
+          exitDate: item.date,
+          entryPrice,
+          exitPrice,
+          return: returnPct,
+          profit
+        });
+      }
+
+      capital += position * exitPrice;
+      position = 0;
+      entryPrice = 0;
+      entryDate = "";
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+/**
+ * ボリンジャースクイーズ戦略のバックテスト
+ */
+export const runBollingerSqueezeStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 30) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const bbWidth = calculateBollingerBandWidth(validData, 20, 2);
+  const squeezeLookback = 20;
+
+  validData.forEach((item, index) => {
+    if (index < 20 + squeezeLookback) return;
+
+    const currentBB = bbWidth[index];
+    if (!currentBB) return;
+
+    // 過去20日間のバンド幅を取得
+    const recentWidths = bbWidth
+      .slice(index - squeezeLookback, index)
+      .filter(bb => bb !== null)
+      .map(bb => bb!.width);
+
+    if (recentWidths.length < squeezeLookback) return;
+
+    // 現在のバンド幅が過去20日間で最小 = スクイーズ検出
+    const minWidth = Math.min(...recentWidths);
+    const isSqueeze = currentBB.width <= minWidth * 1.05; // 5%の許容範囲
+
+    // スクイーズ状態でない場合のみトレード
+    if (!isSqueeze && position === 0) {
+      // 上方ブレイクアウト（%B > 100）
+      if (currentBB.percentB > 100 && item.close > 0) {
+        const rawPosition = capital / item.close;
+        position = Math.floor(rawPosition);
+
+        if (position > 0) {
+          entryPrice = item.close;
+          entryDate = item.date;
+          capital -= position * item.close;
+        }
+      }
+    }
+
+    // ミドルバンドを下抜けたら売り、または5%利益確定
+    if (position > 0 && item.close > 0 && entryPrice > 0) {
+      const profitPct = ((item.close - entryPrice) / entryPrice) * 100;
+      const belowMiddle = item.close < currentBB.middle;
+
+      if (belowMiddle || profitPct > 5 || profitPct < -3) {
         const exitPrice = item.close;
         const profit = position * (exitPrice - entryPrice);
         const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
