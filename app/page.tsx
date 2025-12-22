@@ -444,7 +444,7 @@ export default function Home() {
             <TabsTrigger value="backtest">バックテスト</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="price">
+          <TabsContent value="price" className="relative z-0">
             <Card>
               <CardHeader>
                 <div className="flex justify-between items-center">
@@ -488,7 +488,7 @@ export default function Home() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="weekday">
+          <TabsContent value="weekday" className="relative z-0">
             <Card>
               <CardHeader>
                 <CardTitle>曜日別平均リターン</CardTitle>
@@ -523,7 +523,7 @@ export default function Home() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="monthly">
+          <TabsContent value="monthly" className="relative z-0">
             <Card>
               <CardHeader>
                 <CardTitle>月別パフォーマンス</CardTitle>
@@ -544,7 +544,7 @@ export default function Home() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="heatmap">
+          <TabsContent value="heatmap" className="relative z-0">
             <Card>
               <CardHeader>
                 <CardTitle>月×曜日 ヒートマップ</CardTitle>
@@ -584,7 +584,7 @@ export default function Home() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="backtest">
+          <TabsContent value="backtest" className="relative z-0">
             <Card>
               <CardHeader>
                 <CardTitle>バックテスト結果</CardTitle>
