@@ -1,5 +1,5 @@
 import { StockData, Trade, BacktestResult } from './types';
-import { calculateBacktestStats, getInitialCapital, validateStockData, calculateADX, calculateWilliamsR, calculateCCI, calculateParabolicSAR, calculateATR, calculateMA, calculateSuperTrend, calculateHeikenAshi, calculateChoppinessIndex, calculateEMA, calculateAroon, calculateForceIndex } from './utils';
+import { calculateBacktestStats, getInitialCapital, validateStockData, calculateADX, calculateWilliamsR, calculateCCI, calculateParabolicSAR, calculateATR, calculateMA, calculateSuperTrend, calculateHeikenAshi, calculateChoppinessIndex, calculateEMA, calculateAroon, calculateForceIndex, calculatePivotPoints, calculateFibonacciLevels, calculateROC } from './utils';
 
 /**
  * モメンタム戦略のバックテスト
@@ -1433,6 +1433,274 @@ export const runEMARibbonStrategy = (data: StockData[], strategyName: string): B
       position = 0;
       entryPrice = 0;
       entryDate = "";
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+/**
+ * ピボットポイント戦略のバックテスト
+ */
+export const runPivotPointStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 5) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const pivots = calculatePivotPoints(validData);
+
+  validData.forEach((item, index) => {
+    if (index < 1) return;
+
+    const pivot = pivots[index];
+    if (!pivot) return;
+
+    const currentPrice = item.close;
+    const threshold = 0.005; // 0.5%の許容範囲
+
+    // S1またはS2付近で買い
+    const nearS1 = Math.abs(currentPrice - pivot.s1) / pivot.s1 < threshold;
+    const nearS2 = Math.abs(currentPrice - pivot.s2) / pivot.s2 < threshold;
+
+    if ((nearS1 || nearS2) && position === 0 && currentPrice > 0) {
+      const rawPosition = capital / currentPrice;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = currentPrice;
+        entryDate = item.date;
+        capital -= position * currentPrice;
+      }
+    }
+
+    // R1またはR2付近で売り、またはS2を下抜けたら損切り
+    const nearR1 = Math.abs(currentPrice - pivot.r1) / pivot.r1 < threshold;
+    const nearR2 = Math.abs(currentPrice - pivot.r2) / pivot.r2 < threshold;
+    const belowS2 = currentPrice < pivot.s2 * 0.99; // S2を1%下抜け
+
+    if ((nearR1 || nearR2 || belowS2) && position > 0 && currentPrice > 0 && entryPrice > 0) {
+      const exitPrice = currentPrice;
+      const profit = position * (exitPrice - entryPrice);
+      const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+      if (isFinite(profit) && isFinite(returnPct)) {
+        trades.push({
+          entryDate,
+          exitDate: item.date,
+          entryPrice,
+          exitPrice,
+          return: returnPct,
+          profit
+        });
+      }
+
+      capital += position * exitPrice;
+      position = 0;
+      entryPrice = 0;
+      entryDate = "";
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+/**
+ * フィボナッチリトレースメント戦略のバックテスト
+ */
+export const runFibonacciStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 25) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const fibs = calculateFibonacciLevels(validData, 20);
+
+  validData.forEach((item, index) => {
+    if (index < 20) return;
+
+    const fib = fibs[index];
+    if (!fib) return;
+
+    const currentPrice = item.close;
+    const threshold = 0.01; // 1%の許容範囲
+
+    // フィボナッチ61.8%レベル付近で反転を狙う
+    const nearFib618 = Math.abs(currentPrice - fib.fib618) / fib.fib618 < threshold;
+    const nearFib500 = Math.abs(currentPrice - fib.fib500) / fib.fib500 < threshold;
+
+    if (fib.isUptrend) {
+      // 上昇トレンド後の押し目買い
+      if ((nearFib618 || nearFib500) && position === 0 && currentPrice > 0) {
+        const rawPosition = capital / currentPrice;
+        position = Math.floor(rawPosition);
+
+        if (position > 0) {
+          entryPrice = currentPrice;
+          entryDate = item.date;
+          capital -= position * currentPrice;
+        }
+      }
+
+      // スイング高値付近またはフィボナッチ0%（高値）で売り
+      const nearHigh = currentPrice > fib.high * 0.98;
+      const stopLoss = currentPrice < fib.fib786; // 78.6%を下抜けで損切り
+
+      if ((nearHigh || stopLoss) && position > 0 && currentPrice > 0 && entryPrice > 0) {
+        const exitPrice = currentPrice;
+        const profit = position * (exitPrice - entryPrice);
+        const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+        if (isFinite(profit) && isFinite(returnPct)) {
+          trades.push({
+            entryDate,
+            exitDate: item.date,
+            entryPrice,
+            exitPrice,
+            return: returnPct,
+            profit
+          });
+        }
+
+        capital += position * exitPrice;
+        position = 0;
+        entryPrice = 0;
+        entryDate = "";
+      }
+    } else {
+      // 下降トレンド後の反発売り（ショート想定を買いに変換）
+      const nearLow = currentPrice < fib.low * 1.02;
+
+      if (nearLow && position === 0 && currentPrice > 0) {
+        const rawPosition = capital / currentPrice;
+        position = Math.floor(rawPosition);
+
+        if (position > 0) {
+          entryPrice = currentPrice;
+          entryDate = item.date;
+          capital -= position * currentPrice;
+        }
+      }
+
+      // フィボナッチ61.8%レベル到達で利確
+      if ((nearFib618 || currentPrice > fib.fib500) && position > 0 && currentPrice > 0 && entryPrice > 0) {
+        const exitPrice = currentPrice;
+        const profit = position * (exitPrice - entryPrice);
+        const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+        if (isFinite(profit) && isFinite(returnPct)) {
+          trades.push({
+            entryDate,
+            exitDate: item.date,
+            entryPrice,
+            exitPrice,
+            return: returnPct,
+            profit
+          });
+        }
+
+        capital += position * exitPrice;
+        position = 0;
+        entryPrice = 0;
+        entryDate = "";
+      }
+    }
+  });
+
+  if (position > 0 && validData.length > 0 && validData[validData.length - 1].close > 0) {
+    capital += position * validData[validData.length - 1].close;
+  }
+
+  return calculateBacktestStats(trades, capital, initialCapital, strategyName);
+};
+
+/**
+ * ROC（Rate of Change）戦略のバックテスト
+ */
+export const runROCStrategy = (data: StockData[], strategyName: string): BacktestResult => {
+  const initialCapital = getInitialCapital(data);
+  let capital = initialCapital;
+  let position = 0;
+  const trades: Trade[] = [];
+  let entryPrice = 0;
+  let entryDate = "";
+
+  const validData = validateStockData(data);
+
+  if (validData.length < 20) {
+    return calculateBacktestStats([], capital, initialCapital, strategyName);
+  }
+
+  const roc = calculateROC(validData, 12);
+
+  validData.forEach((item, index) => {
+    if (index < 13) return;
+
+    const rocValue = roc[index];
+    const prevROCValue = roc[index - 1];
+
+    if (rocValue === null || prevROCValue === null || !isFinite(rocValue) || !isFinite(prevROCValue)) return;
+
+    // ROCがゼロラインを下から上に抜けたら買い（上昇モメンタム）
+    if (prevROCValue <= 0 && rocValue > 0 && position === 0 && item.close > 0) {
+      const rawPosition = capital / item.close;
+      position = Math.floor(rawPosition);
+
+      if (position > 0) {
+        entryPrice = item.close;
+        entryDate = item.date;
+        capital -= position * item.close;
+      }
+    }
+
+    // ROCがゼロラインを上から下に抜けたら売り（下降モメンタム）
+    // または過熱感（ROC > 10%）で利確
+    if ((prevROCValue >= 0 && rocValue < 0) || rocValue > 10) {
+      if (position > 0 && item.close > 0 && entryPrice > 0) {
+        const exitPrice = item.close;
+        const profit = position * (exitPrice - entryPrice);
+        const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+
+        if (isFinite(profit) && isFinite(returnPct)) {
+          trades.push({
+            entryDate,
+            exitDate: item.date,
+            entryPrice,
+            exitPrice,
+            return: returnPct,
+            profit
+          });
+        }
+
+        capital += position * exitPrice;
+        position = 0;
+        entryPrice = 0;
+        entryDate = "";
+      }
     }
   });
 

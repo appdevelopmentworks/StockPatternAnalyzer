@@ -32,7 +32,10 @@ import {
   runChoppinessStrategy,
   runAroonStrategy,
   runForceIndexStrategy,
-  runEMARibbonStrategy
+  runEMARibbonStrategy,
+  runPivotPointStrategy,
+  runFibonacciStrategy,
+  runROCStrategy
 } from './advanced-strategies';
 import {
   runCompositeStrategy,
@@ -111,6 +114,9 @@ export const runAllBacktests = (data: StockData[]): BacktestResult[] => {
     results.push(runAroonStrategy(validData, "アルーン指標"));
     results.push(runForceIndexStrategy(validData, "エルダーのフォースインデックス"));
     results.push(runEMARibbonStrategy(validData, "EMAリボン戦略"));
+    results.push(runPivotPointStrategy(validData, "ピボットポイント"));
+    results.push(runFibonacciStrategy(validData, "フィボナッチリトレースメント"));
+    results.push(runROCStrategy(validData, "ROC（変化率）"));
 
     // 複合・特殊戦略
     console.log('複合・特殊戦略を実行中...');

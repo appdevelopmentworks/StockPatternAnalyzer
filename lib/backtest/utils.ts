@@ -680,6 +680,141 @@ export const calculateForceIndex = (data: any[], period: number = 13): (number |
 };
 
 /**
+ * ピボットポイントを計算する
+ * @param data 株価データ
+ * @returns {pivot, s1, s2, r1, r2}の配列
+ */
+export const calculatePivotPoints = (data: any[]): Array<{pivot: number, s1: number, s2: number, r1: number, r2: number} | null> => {
+  const pivots: Array<{pivot: number, s1: number, s2: number, r1: number, r2: number} | null> = new Array(data.length).fill(null);
+
+  if (data.length < 2) return pivots;
+
+  for (let i = 1; i < data.length; i++) {
+    const prevHigh = data[i - 1].high;
+    const prevLow = data[i - 1].low;
+    const prevClose = data[i - 1].close;
+
+    // ピボットポイント = (前日高値 + 前日安値 + 前日終値) / 3
+    const pivot = (prevHigh + prevLow + prevClose) / 3;
+
+    // サポート・レジスタンスレベル
+    const r1 = (2 * pivot) - prevLow;
+    const s1 = (2 * pivot) - prevHigh;
+    const r2 = pivot + (prevHigh - prevLow);
+    const s2 = pivot - (prevHigh - prevLow);
+
+    pivots[i] = {
+      pivot: isFinite(pivot) ? pivot : 0,
+      s1: isFinite(s1) ? s1 : 0,
+      s2: isFinite(s2) ? s2 : 0,
+      r1: isFinite(r1) ? r1 : 0,
+      r2: isFinite(r2) ? r2 : 0
+    };
+  }
+
+  return pivots;
+};
+
+/**
+ * フィボナッチリトレースメントレベルを計算する
+ * @param data 株価データ
+ * @param lookback スイング高値・安値を探す期間（デフォルト20日）
+ * @returns {high, low, fib236, fib382, fib500, fib618, fib786}の配列
+ */
+export const calculateFibonacciLevels = (data: any[], lookback: number = 20): Array<{
+  high: number,
+  low: number,
+  fib236: number,
+  fib382: number,
+  fib500: number,
+  fib618: number,
+  fib786: number,
+  isUptrend: boolean
+} | null> => {
+  const fibs: Array<{
+    high: number,
+    low: number,
+    fib236: number,
+    fib382: number,
+    fib500: number,
+    fib618: number,
+    fib786: number,
+    isUptrend: boolean
+  } | null> = new Array(data.length).fill(null);
+
+  if (data.length < lookback) return fibs;
+
+  for (let i = lookback; i < data.length; i++) {
+    const slice = data.slice(i - lookback, i);
+
+    // スイング高値・安値を検出
+    const swingHigh = Math.max(...slice.map((d: any) => d.high));
+    const swingLow = Math.min(...slice.map((d: any) => d.low));
+    const range = swingHigh - swingLow;
+
+    // 最近の価格動向を判定（上昇トレンドか下降トレンドか）
+    const recentClose = data[i - 1].close;
+    const isUptrend = recentClose > (swingHigh + swingLow) / 2;
+
+    // フィボナッチレベルを計算（上昇トレンド後の調整を想定）
+    let fib236, fib382, fib500, fib618, fib786;
+
+    if (isUptrend) {
+      // 上昇トレンド：高値からの調整レベル
+      fib236 = swingHigh - (range * 0.236);
+      fib382 = swingHigh - (range * 0.382);
+      fib500 = swingHigh - (range * 0.500);
+      fib618 = swingHigh - (range * 0.618);
+      fib786 = swingHigh - (range * 0.786);
+    } else {
+      // 下降トレンド：安値からの反発レベル
+      fib236 = swingLow + (range * 0.236);
+      fib382 = swingLow + (range * 0.382);
+      fib500 = swingLow + (range * 0.500);
+      fib618 = swingLow + (range * 0.618);
+      fib786 = swingLow + (range * 0.786);
+    }
+
+    fibs[i] = {
+      high: swingHigh,
+      low: swingLow,
+      fib236: isFinite(fib236) ? fib236 : 0,
+      fib382: isFinite(fib382) ? fib382 : 0,
+      fib500: isFinite(fib500) ? fib500 : 0,
+      fib618: isFinite(fib618) ? fib618 : 0,
+      fib786: isFinite(fib786) ? fib786 : 0,
+      isUptrend
+    };
+  }
+
+  return fibs;
+};
+
+/**
+ * ROC（Rate of Change / 変化率）を計算する
+ * @param data 株価データ
+ * @param period 期間（デフォルト12日）
+ * @returns ROC配列
+ */
+export const calculateROC = (data: any[], period: number = 12): (number | null)[] => {
+  const roc: (number | null)[] = new Array(data.length).fill(null);
+
+  if (data.length < period + 1) return roc;
+
+  for (let i = period; i < data.length; i++) {
+    const currentPrice = data[i].close;
+    const pastPrice = data[i - period].close;
+
+    if (pastPrice > 0) {
+      const rocValue = ((currentPrice - pastPrice) / pastPrice) * 100;
+      roc[i] = isFinite(rocValue) ? rocValue : null;
+    }
+  }
+
+  return roc;
+};
+
+/**
  * データの妥当性をチェックする
  */
 export const validateStockData = (data: any[]): any[] => {
