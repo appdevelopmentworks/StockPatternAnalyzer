@@ -1002,11 +1002,16 @@ export const runSuperTrendStrategy = (data: StockData[], strategyName: string): 
 
   const validData = validateStockData(data);
 
+  console.log(`[スーパートレンド] データ数: ${validData.length}`);
+
   if (validData.length < 15) {
+    console.log(`[スーパートレンド] データ不足 (${validData.length} < 15)`);
     return calculateBacktestStats([], capital, initialCapital, strategyName);
   }
 
   const superTrend = calculateSuperTrend(validData, 10, 3);
+  const validSTValues = superTrend.filter(v => v !== null && isFinite(v));
+  console.log(`[スーパートレンド] 有効なST値: ${validSTValues.length}/${superTrend.length}`);
 
   validData.forEach((item, index) => {
     if (index < 11) return;
@@ -1016,8 +1021,8 @@ export const runSuperTrendStrategy = (data: StockData[], strategyName: string): 
 
     if (!stValue || !prevSTValue || !isFinite(stValue) || !isFinite(prevSTValue)) return;
 
-    // トレンド転換：下降→上昇で買い
-    if (prevSTValue < 0 && stValue > 0 && position === 0 && item.close > 0) {
+    // 上昇トレンド中（正の値）でポジションがない場合は買い - 改善
+    if (stValue > 0 && position === 0 && item.close > 0) {
       const rawPosition = capital / item.close;
       position = Math.floor(rawPosition);
 
@@ -1028,8 +1033,8 @@ export const runSuperTrendStrategy = (data: StockData[], strategyName: string): 
       }
     }
 
-    // トレンド転換：上昇→下降で売り
-    if (prevSTValue > 0 && stValue < 0 && position > 0 && item.close > 0 && entryPrice > 0) {
+    // 下降トレンドに転換（負の値）したら売り - 改善
+    if (stValue < 0 && position > 0 && item.close > 0 && entryPrice > 0) {
       const exitPrice = item.close;
       const profit = position * (exitPrice - entryPrice);
       const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
@@ -1072,26 +1077,35 @@ export const runHeikenAshiStrategy = (data: StockData[], strategyName: string): 
 
   const validData = validateStockData(data);
 
+  console.log(`[平均足] データ数: ${validData.length}`);
+
   if (validData.length < 5) {
+    console.log(`[平均足] データ不足 (${validData.length} < 5)`);
     return calculateBacktestStats([], capital, initialCapital, strategyName);
   }
 
   const ha = calculateHeikenAshi(validData);
+  const validHAValues = ha.filter(v => v !== null);
+  console.log(`[平均足] 有効なHA値: ${validHAValues.length}/${ha.length}`);
 
   validData.forEach((item, index) => {
     if (index < 2) return;
 
     const currentHA = ha[index];
     const prevHA = ha[index - 1];
+    const prev2HA = index >= 3 ? ha[index - 2] : null;
 
     if (!currentHA || !prevHA) return;
 
-    // 連続陽線（上昇トレンド）で買い
+    // 平均足の状態判定
     const isBullish = currentHA.close > currentHA.open;
     const wasBullish = prevHA.close > prevHA.open;
+    const was2Bullish = prev2HA ? prev2HA.close > prev2HA.open : false;
 
-    // 陰線から陽線に転換で買い
-    if (!wasBullish && isBullish && position === 0 && item.close > 0) {
+    // 連続2本以上の陽線で買い（より確実なトレンド）- 改善
+    const bullishTrend = isBullish && wasBullish;
+
+    if (bullishTrend && position === 0 && item.close > 0) {
       const rawPosition = capital / item.close;
       position = Math.floor(rawPosition);
 
@@ -1102,8 +1116,10 @@ export const runHeikenAshiStrategy = (data: StockData[], strategyName: string): 
       }
     }
 
-    // 陽線から陰線に転換で売り
-    if (wasBullish && !isBullish && position > 0 && item.close > 0 && entryPrice > 0) {
+    // 陽線から陰線に転換で売り、または連続2本の陰線で売り
+    const bearishSignal = (wasBullish && !isBullish) || (!isBullish && !wasBullish);
+
+    if (bearishSignal && position > 0 && item.close > 0 && entryPrice > 0) {
       const exitPrice = item.close;
       const profit = position * (exitPrice - entryPrice);
       const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
@@ -1162,11 +1178,11 @@ export const runChoppinessStrategy = (data: StockData[], strategyName: string): 
 
     if (!ciValue || !ma20Value || !prevMA || !isFinite(ciValue) || !isFinite(ma20Value) || !isFinite(prevMA)) return;
 
-    // チョピネス指数が38以下（トレンド相場）の時のみトレード
-    const isTrending = ciValue < 38;
+    // チョピネス指数が50以下（トレンド相場）の時のみトレード - 緩和
+    const isTrending = ciValue < 50;
 
-    // トレンド相場で価格がMAを上抜けたら買い
-    if (isTrending && item.close > ma20Value && validData[index - 1].close <= prevMA && position === 0 && item.close > 0) {
+    // トレンド相場で価格がMAより上にあれば買い - 緩和
+    if (isTrending && item.close > ma20Value && position === 0 && item.close > 0) {
       const rawPosition = capital / item.close;
       position = Math.floor(rawPosition);
 
@@ -1179,7 +1195,8 @@ export const runChoppinessStrategy = (data: StockData[], strategyName: string): 
 
     // レンジ相場になったら（CI > 61）または価格がMAを下抜けたら売り
     const isRanging = ciValue > 61;
-    if ((isRanging || item.close < ma20Value) && position > 0 && item.close > 0 && entryPrice > 0) {
+    const belowMA = item.close < ma20Value * 0.98; // 2%下抜けで売り - 緩和
+    if ((isRanging || belowMA) && position > 0 && item.close > 0 && entryPrice > 0) {
       const exitPrice = item.close;
       const profit = position * (exitPrice - entryPrice);
       const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
@@ -1236,8 +1253,12 @@ export const runAroonStrategy = (data: StockData[], strategyName: string): Backt
 
     if (!aroonValue || !prevAroonValue) return;
 
-    // Aroon Up > 70 かつ Aroon Down < 30 で買い（強い上昇トレンド）
-    if (aroonValue.aroonUp > 70 && aroonValue.aroonDown < 30 && position === 0 && item.close > 0) {
+    // Aroon Up > 50 かつ Aroon Down < 50 で買い（上昇トレンド）- 緩和
+    // またはAroon Upがクロスオーバーした時
+    const bullishSignal = (aroonValue.aroonUp > 50 && aroonValue.aroonDown < 50) ||
+                          (prevAroonValue.aroonUp <= prevAroonValue.aroonDown && aroonValue.aroonUp > aroonValue.aroonDown);
+
+    if (bullishSignal && position === 0 && item.close > 0) {
       const rawPosition = capital / item.close;
       position = Math.floor(rawPosition);
 
@@ -1248,10 +1269,10 @@ export const runAroonStrategy = (data: StockData[], strategyName: string): Backt
       }
     }
 
-    // Aroon Down > 70 かつ Aroon Up < 30 で売り（強い下降トレンド）
+    // Aroon Down > 50 かつ Aroon Up < 50 で売り（下降トレンド）
     // または Aroon Up と Aroon Down が交差したら売り
     if (position > 0 && item.close > 0 && entryPrice > 0) {
-      const shouldExit = (aroonValue.aroonDown > 70 && aroonValue.aroonUp < 30) ||
+      const shouldExit = (aroonValue.aroonDown > 50 && aroonValue.aroonUp < 50) ||
                          (prevAroonValue.aroonUp > prevAroonValue.aroonDown && aroonValue.aroonUp < aroonValue.aroonDown);
 
       if (shouldExit) {
@@ -1469,7 +1490,7 @@ export const runPivotPointStrategy = (data: StockData[], strategyName: string): 
     if (!pivot) return;
 
     const currentPrice = item.close;
-    const threshold = 0.005; // 0.5%の許容範囲
+    const threshold = 0.02; // 2%の許容範囲（緩和）
 
     // S1またはS2付近で買い
     const nearS1 = Math.abs(currentPrice - pivot.s1) / pivot.s1 < threshold;
@@ -1547,7 +1568,7 @@ export const runFibonacciStrategy = (data: StockData[], strategyName: string): B
     if (!fib) return;
 
     const currentPrice = item.close;
-    const threshold = 0.01; // 1%の許容範囲
+    const threshold = 0.03; // 3%の許容範囲（緩和）
 
     // フィボナッチ61.8%レベル付近で反転を狙う
     const nearFib618 = Math.abs(currentPrice - fib.fib618) / fib.fib618 < threshold;
@@ -1678,8 +1699,8 @@ export const runROCStrategy = (data: StockData[], strategyName: string): Backtes
     }
 
     // ROCがゼロラインを上から下に抜けたら売り（下降モメンタム）
-    // または過熱感（ROC > 10%）で利確
-    if ((prevROCValue >= 0 && rocValue < 0) || rocValue > 10) {
+    // または過熱感（ROC > 8%）で利確
+    if ((prevROCValue >= 0 && rocValue < 0) || rocValue > 8) {
       if (position > 0 && item.close > 0 && entryPrice > 0) {
         const exitPrice = item.close;
         const profit = position * (exitPrice - entryPrice);

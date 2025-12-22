@@ -108,8 +108,26 @@ export const runAllBacktests = (data: StockData[]): BacktestResult[] => {
     results.push(runCCIStrategy(validData, "CCI戦略"));
     results.push(runParabolicSARStrategy(validData, "パラボリックSAR"));
     results.push(runKeltnerChannelStrategy(validData, "ケルトナーチャネル"));
-    results.push(runSuperTrendStrategy(validData, "スーパートレンド"));
-    results.push(runHeikenAshiStrategy(validData, "平均足"));
+    console.log('スーパートレンド戦略を実行中...');
+    const superTrendResult = runSuperTrendStrategy(validData, "スーパートレンド");
+    console.log('スーパートレンド結果:', {
+      strategy: superTrendResult.strategy,
+      totalTrades: superTrendResult.totalTrades,
+      totalReturn: superTrendResult.totalReturn,
+      winRate: superTrendResult.winRate
+    });
+    results.push(superTrendResult);
+
+    console.log('平均足戦略を実行中...');
+    const heikenAshiResult = runHeikenAshiStrategy(validData, "平均足");
+    console.log('平均足結果:', {
+      strategy: heikenAshiResult.strategy,
+      totalTrades: heikenAshiResult.totalTrades,
+      totalReturn: heikenAshiResult.totalReturn,
+      winRate: heikenAshiResult.winRate
+    });
+    results.push(heikenAshiResult);
+
     results.push(runChoppinessStrategy(validData, "チョピネス指数"));
     results.push(runAroonStrategy(validData, "アルーン指標"));
     results.push(runForceIndexStrategy(validData, "エルダーのフォースインデックス"));
@@ -127,13 +145,33 @@ export const runAllBacktests = (data: StockData[]): BacktestResult[] => {
     results.push(runVWMAStrategy(validData, "出来高加重移動平均（VWMA）"));
     
     // 結果のフィルタリング
-    const validResults = results.filter(result => 
-      result && 
-      isFinite(result.totalReturn) && 
-      isFinite(result.winRate) && 
+    const validResults = results.filter(result =>
+      result &&
+      isFinite(result.totalReturn) &&
+      isFinite(result.winRate) &&
       result.totalTrades >= 0
     );
-    
+
+    // デバッグ：フィルタリングされた戦略を表示
+    const filteredOut = results.filter(result =>
+      !result ||
+      !isFinite(result.totalReturn) ||
+      !isFinite(result.winRate) ||
+      result.totalTrades < 0
+    );
+
+    if (filteredOut.length > 0) {
+      console.warn(`フィルタリングされた戦略 (${filteredOut.length}):`,
+        filteredOut.map(r => r?.strategy || 'unknown').join(', '));
+    }
+
+    // 取引がゼロの戦略を表示
+    const noTrades = validResults.filter(r => r.totalTrades === 0);
+    if (noTrades.length > 0) {
+      console.warn(`取引がゼロの戦略 (${noTrades.length}):`,
+        noTrades.map(r => r.strategy).join(', '));
+    }
+
     console.log(`バックテスト完了: ${validResults.length}/${results.length}戦略が有効`);
     return validResults;
     

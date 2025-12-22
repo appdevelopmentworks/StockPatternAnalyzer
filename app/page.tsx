@@ -961,7 +961,16 @@ export default function Home() {
                             r.strategy.includes("ウィリアムズ%R") ||
                             r.strategy.includes("CCI戦略") ||
                             r.strategy.includes("パラボリックSAR") ||
-                            r.strategy.includes("ケルトナーチャネル")
+                            r.strategy.includes("ケルトナーチャネル") ||
+                            r.strategy.includes("スーパートレンド") ||
+                            r.strategy.includes("平均足") ||
+                            r.strategy.includes("チョピネス指数") ||
+                            r.strategy.includes("アルーン指標") ||
+                            r.strategy.includes("エルダーのフォースインデックス") ||
+                            r.strategy.includes("EMAリボン戦略") ||
+                            r.strategy.includes("ピボットポイント") ||
+                            r.strategy.includes("フィボナッチリトレースメント") ||
+                            r.strategy.includes("ROC（変化率）")
                           ).map((result, index) => (
                             <Card key={result.strategy} 
                                   className={`cursor-pointer transition-all hover:shadow-lg ${selectedStrategy === backtestResults.indexOf(result).toString() ? 'border-2 border-blue-500' : ''} group relative`}
