@@ -77,6 +77,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [stockData, setStockData] = useState<StockData[]>([]);
   const [stats, setStats] = useState<StockStats | null>(null);
+  const [companyName, setCompanyName] = useState<string>("");
   const [weekdayData, setWeekdayData] = useState<any[]>([]);
   const [monthlyData, setMonthlyData] = useState<any[]>([]);
   const [heatmapData, setHeatmapData] = useState<any[]>([]);
@@ -194,7 +195,8 @@ export default function Home() {
         
         setStockData(data.data);
         setStats(data.stats);
-        
+        setCompanyName(data.companyName || ticker);
+
         // アナリティクス処理
         console.log('アナリティクス処理開始');
         const analyticsResult = processAnalytics(data.data);
@@ -409,7 +411,20 @@ export default function Home() {
 
         {/* 統計情報 */}
         {stats && !error && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <>
+            {/* 企業名表示 */}
+            {companyName && (
+              <div className="mb-4">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {companyName}
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {ticker}
+                </p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
@@ -463,6 +478,7 @@ export default function Home() {
               </CardContent>
             </Card>
           </div>
+          </>
         )}
 
         {/* メインコンテンツ */}

@@ -2,14 +2,21 @@ import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const ticker = searchParams.get('ticker') || 'AAPL';
+  const originalTicker = searchParams.get('ticker') || 'AAPL';
   const period = searchParams.get('period') || '1y';
   const interval = searchParams.get('interval') || '1d';
+
+  // 日本企業の証券コード（4桁の数字のみ）の場合、.T を自動追加
+  let ticker = originalTicker;
+  if (/^\d{4}$/.test(ticker)) {
+    ticker = `${ticker}.T`;
+    console.log(`日本企業の証券コード検出: ${originalTicker} → ${ticker}`);
+  }
 
   try {
     // Yahoo Finance APIのプロキシエンドポイントを使用
     const baseUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/';
-    
+
     // 期間の計算
     const now = Math.floor(Date.now() / 1000);
     let period1;
@@ -101,9 +108,104 @@ export async function GET(request: Request) {
     };
 
     console.log(`Successfully fetched ${formattedData.length} data points for ${ticker}`);
+    console.log('Meta data:', JSON.stringify(result.meta, null, 2));
+
+    // 日本企業および主要企業の名称マッピング
+    const companyNameMap: { [key: string]: string } = {
+      // 日本企業
+      '7203': 'トヨタ自動車',
+      '7203.T': 'トヨタ自動車',
+      '9984': 'ソフトバンクグループ',
+      '9984.T': 'ソフトバンクグループ',
+      '6758': 'ソニーグループ',
+      '6758.T': 'ソニーグループ',
+      '9983': 'ファーストリテイリング',
+      '9983.T': 'ファーストリテイリング',
+      '6861': 'キーエンス',
+      '6861.T': 'キーエンス',
+      '7974': '任天堂',
+      '7974.T': '任天堂',
+      '8306': '三菱UFJフィナンシャル・グループ',
+      '8306.T': '三菱UFJフィナンシャル・グループ',
+      '6098': 'リクルートホールディングス',
+      '6098.T': 'リクルートホールディングス',
+      '4063': '信越化学工業',
+      '4063.T': '信越化学工業',
+      '8035': '東京エレクトロン',
+      '8035.T': '東京エレクトロン',
+      '4568': '第一三共',
+      '4568.T': '第一三共',
+      '4519': '中外製薬',
+      '4519.T': '中外製薬',
+      '4502': '武田薬品工業',
+      '4502.T': '武田薬品工業',
+      '9433': 'KDDI',
+      '9433.T': 'KDDI',
+      '9432': '日本電信電話',
+      '9432.T': '日本電信電話',
+      '8058': '三菱商事',
+      '8058.T': '三菱商事',
+      '8031': '三井物産',
+      '8031.T': '三井物産',
+      '2914': '日本たばこ産業',
+      '2914.T': '日本たばこ産業',
+      '4755': '楽天グループ',
+      '4755.T': '楽天グループ',
+      '7267': '本田技研工業',
+      '7267.T': '本田技研工業',
+      '7751': 'キヤノン',
+      '7751.T': 'キヤノン',
+      '6954': 'ファナック',
+      '6954.T': 'ファナック',
+      '6981': '村田製作所',
+      '6981.T': '村田製作所',
+      '6752': 'パナソニック ホールディングス',
+      '6752.T': 'パナソニック ホールディングス',
+      '6503': '三菱電機',
+      '6503.T': '三菱電機',
+      '8001': '伊藤忠商事',
+      '8001.T': '伊藤忠商事',
+      '9434': 'ソフトバンク',
+      '9434.T': 'ソフトバンク',
+      '8151': '東京海上ホールディングス',
+      '8151.T': '東京海上ホールディングス',
+      '4449': 'ギフティ',
+      '4449.T': 'ギフティ',
+      '8252': '丸井グループ',
+      '8252.T': '丸井グループ',
+      '9020': '東日本旅客鉄道',
+      '9020.T': '東日本旅客鉄道',
+      '9021': '西日本旅客鉄道',
+      '9021.T': '西日本旅客鉄道',
+      '2802': '味の素',
+      '2802.T': '味の素',
+      '4503': 'アステラス製薬',
+      '4503.T': 'アステラス製薬',
+      '4452': '花王',
+      '4452.T': '花王',
+      '7201': '日産自動車',
+      '7201.T': '日産自動車',
+      '7269': 'スズキ',
+      '7269.T': 'スズキ',
+      '7270': 'SUBARU',
+      '7270.T': 'SUBARU',
+      '^N225': '日経平均株価'
+    };
+
+    // 企業名を取得（複数のフィールドを試行）
+    let companyName = result.meta?.longName ||
+                      result.meta?.shortName ||
+                      result.meta?.displayName ||
+                      result.meta?.name ||
+                      companyNameMap[ticker] ||
+                      ticker;
+
+    console.log('Extracted company name:', companyName);
 
     return NextResponse.json({
-      ticker,
+      ticker: originalTicker,  // 元のティッカーを返す
+      displayTicker: ticker,   // APIリクエストに使用したティッカー
+      companyName,
       data: formattedData,
       stats,
       meta: result.meta
@@ -115,11 +217,109 @@ export async function GET(request: Request) {
     // フォールバック: デモデータを返す（特に仮想通貨や指数の場合）
     const demoData = generateDemoData(ticker, period);
     const demoStats = calculateDemoStats(demoData);
-    
+
+    // デモデータ用の企業名マッピング
+    const companyNameMap: { [key: string]: string } = {
+      'AAPL': 'Apple Inc.',
+      'GOOGL': 'Alphabet Inc.',
+      'MSFT': 'Microsoft Corporation',
+      'TSLA': 'Tesla, Inc.',
+      'META': 'Meta Platforms, Inc.',
+      'AMZN': 'Amazon.com, Inc.',
+      'NVDA': 'NVIDIA Corporation',
+      'BTC-USD': 'Bitcoin USD',
+      'ETH-USD': 'Ethereum USD',
+      'SPY': 'S&P 500 ETF',
+      '^N225': '日経平均株価',
+      'GC=F': '金先物',
+      '^TNX': '米国10年国債利回り',
+      'IYR': 'iShares U.S. Real Estate ETF',
+      // 日本企業
+      '7203': 'トヨタ自動車',
+      '7203.T': 'トヨタ自動車',
+      '9984': 'ソフトバンクグループ',
+      '9984.T': 'ソフトバンクグループ',
+      '6758': 'ソニーグループ',
+      '6758.T': 'ソニーグループ',
+      '9983': 'ファーストリテイリング',
+      '9983.T': 'ファーストリテイリング',
+      '6861': 'キーエンス',
+      '6861.T': 'キーエンス',
+      '7974': '任天堂',
+      '7974.T': '任天堂',
+      '8306': '三菱UFJフィナンシャル・グループ',
+      '8306.T': '三菱UFJフィナンシャル・グループ',
+      '6098': 'リクルートホールディングス',
+      '6098.T': 'リクルートホールディングス',
+      '4063': '信越化学工業',
+      '4063.T': '信越化学工業',
+      '8035': '東京エレクトロン',
+      '8035.T': '東京エレクトロン',
+      '4568': '第一三共',
+      '4568.T': '第一三共',
+      '4519': '中外製薬',
+      '4519.T': '中外製薬',
+      '4502': '武田薬品工業',
+      '4502.T': '武田薬品工業',
+      '9433': 'KDDI',
+      '9433.T': 'KDDI',
+      '9432': '日本電信電話',
+      '9432.T': '日本電信電話',
+      '8058': '三菱商事',
+      '8058.T': '三菱商事',
+      '8031': '三井物産',
+      '8031.T': '三井物産',
+      '2914': '日本たばこ産業',
+      '2914.T': '日本たばこ産業',
+      '4755': '楽天グループ',
+      '4755.T': '楽天グループ',
+      '7267': '本田技研工業',
+      '7267.T': '本田技研工業',
+      '7751': 'キヤノン',
+      '7751.T': 'キヤノン',
+      '6954': 'ファナック',
+      '6954.T': 'ファナック',
+      '6981': '村田製作所',
+      '6981.T': '村田製作所',
+      '6752': 'パナソニック ホールディングス',
+      '6752.T': 'パナソニック ホールディングス',
+      '6503': '三菱電機',
+      '6503.T': '三菱電機',
+      '8001': '伊藤忠商事',
+      '8001.T': '伊藤忠商事',
+      '9434': 'ソフトバンク',
+      '9434.T': 'ソフトバンク',
+      '8151': '東京海上ホールディングス',
+      '8151.T': '東京海上ホールディングス',
+      '4449': 'ギフティ',
+      '4449.T': 'ギフティ',
+      '8252': '丸井グループ',
+      '8252.T': '丸井グループ',
+      '9020': '東日本旅客鉄道',
+      '9020.T': '東日本旅客鉄道',
+      '9021': '西日本旅客鉄道',
+      '9021.T': '西日本旅客鉄道',
+      '2802': '味の素',
+      '2802.T': '味の素',
+      '4503': 'アステラス製薬',
+      '4503.T': 'アステラス製薬',
+      '4452': '花王',
+      '4452.T': '花王',
+      '7201': '日産自動車',
+      '7201.T': '日産自動車',
+      '7269': 'スズキ',
+      '7269.T': 'スズキ',
+      '7270': 'SUBARU',
+      '7270.T': 'SUBARU'
+    };
+    const companyName = companyNameMap[ticker] || ticker;
+
     console.log(`Using demo data for ${ticker}`);
-    
+
     return NextResponse.json({
-      ticker,
+      ticker: originalTicker,  // 元のティッカーを返す
+      displayTicker: ticker,   // APIリクエストに使用したティッカー
+      companyName,
       data: demoData,
       stats: demoStats,
       demo: true,
