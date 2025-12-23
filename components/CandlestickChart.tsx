@@ -100,28 +100,30 @@ export default function CandlestickChart({ data, currencySymbol }: CandlestickCh
 
   // 価格をピクセル座標に変換する関数
   const priceToY = (price: number) => {
-    return ((paddedMax - price) / adjustedRange) * 380 + 20; // 380pxの高さに変更、1ラベルマージン
+    return ((paddedMax - price) / adjustedRange) * 380 + 10; // 上マージンを20から10に削減
   };
 
-  // チャートの幅とキャンドルの幅を計算
-  const chartWidth = 800;
+  // チャートの幅とキャンドルの幅を計算（レスポンシブ対応）
+  const chartWidth = typeof window !== 'undefined' ? Math.max(window.innerWidth * 0.85, 600) : 800;
   const candleWidth = Math.max(chartWidth / data.length * 0.6, 2);
   const candleSpacing = chartWidth / data.length;
 
   return (
-    <div className="w-full h-[500px] bg-white dark:bg-gray-800 border rounded-lg p-4">
-      <div className="mb-4">
+    <div className="w-full bg-white dark:bg-gray-800 border rounded-lg p-4">
+      <div className="mb-3">
         <h3 className="text-lg font-semibold">ローソク足チャート</h3>
         <p className="text-sm text-gray-600 dark:text-gray-400">
           5日移動平均（橙）、3週間移動平均（紫）、200日移動平均（緑）
         </p>
       </div>
-      
-      <div className="relative w-full h-[450px] overflow-x-auto">
-        <div className="flex justify-end"> {/* チャートを右寄せに */}
-          <svg 
-            width={Math.max(chartWidth + 100, data.length * 10 + 100)} 
-            height="420" 
+
+      <div className="relative w-full h-[430px]">
+        <div className="w-full flex justify-center">
+          <svg
+            width="100%"
+            height="430"
+            viewBox={`0 0 ${chartWidth + 100} 430`}
+            preserveAspectRatio="none"
             className="border rounded"
           >
             {/* 背景グリッド */}
@@ -218,7 +220,7 @@ export default function CandlestickChart({ data, currencySymbol }: CandlestickCh
                   {/* 透明なホバー領域 */}
                   <rect
                     x={x - candleSpacing / 2}
-                    y={20}
+                    y={10}
                     width={candleSpacing}
                     height={380}
                     fill="transparent"
@@ -234,28 +236,28 @@ export default function CandlestickChart({ data, currencySymbol }: CandlestickCh
             {/* Y軸目盛り線 */}
             <g className="stroke-gray-200 dark:stroke-gray-700" strokeWidth="1" strokeDasharray="2,2">
               {/* 水平グリッドライン */}
-              <line x1="50" y1="20" x2={Math.max(chartWidth + 100, data.length * 10 + 100)} y2="20" stroke="currentColor" />
-              <line x1="50" y1="210" x2={Math.max(chartWidth + 100, data.length * 10 + 100)} y2="210" stroke="currentColor" />
-              <line x1="50" y1="400" x2={Math.max(chartWidth + 100, data.length * 10 + 100)} y2="400" stroke="currentColor" strokeDasharray="none" />
+              <line x1="50" y1="10" x2={chartWidth + 100} y2="10" stroke="currentColor" />
+              <line x1="50" y1="200" x2={chartWidth + 100} y2="200" stroke="currentColor" />
+              <line x1="50" y1="390" x2={chartWidth + 100} y2="390" stroke="currentColor" strokeDasharray="none" />
             </g>
-            
+
             {/* Y軸ラベルをSVG内に移動 */}
             <g className="text-xs fill-gray-600 dark:fill-gray-400">
-              <text x="5" y="25" textAnchor="start">{currencySymbol}{paddedMax.toFixed(0)}</text>
-              <text x="5" y="210" textAnchor="start">{currencySymbol}{((paddedMax + paddedMin) / 2).toFixed(0)}</text>
-              <text x="5" y="400" textAnchor="start">{currencySymbol}{paddedMin.toFixed(0)}</text>
+              <text x="5" y="15" textAnchor="start">{currencySymbol}{paddedMax.toFixed(0)}</text>
+              <text x="5" y="205" textAnchor="start">{currencySymbol}{((paddedMax + paddedMin) / 2).toFixed(0)}</text>
+              <text x="5" y="395" textAnchor="start">{currencySymbol}{paddedMin.toFixed(0)}</text>
             </g>
             
             {/* X軸目盛り線と垂直グリッド */}
             <g className="stroke-gray-300 dark:stroke-gray-600" strokeWidth="1">
               {/* X軸ベースライン */}
-              <line x1="50" y1="400" x2={Math.max(chartWidth + 100, data.length * 10 + 100)} y2="400" stroke="currentColor" />
-              
+              <line x1="50" y1="390" x2={chartWidth + 100} y2="390" stroke="currentColor" />
+
               {(() => {
                 const tickCount = Math.min(10, Math.floor(data.length / 5));
                 const interval = Math.floor(data.length / tickCount);
                 const ticks = [];
-                
+
                 for (let i = 0; i < tickCount; i++) {
                   const index = i * interval;
                   if (index < data.length) {
@@ -265,9 +267,9 @@ export default function CandlestickChart({ data, currencySymbol }: CandlestickCh
                       <line
                         key={`tick-${index}`}
                         x1={x}
-                        y1="400"
+                        y1="390"
                         x2={x}
-                        y2="410"
+                        y2="400"
                         stroke="currentColor"
                       />
                     );
@@ -276,9 +278,9 @@ export default function CandlestickChart({ data, currencySymbol }: CandlestickCh
                       <line
                         key={`grid-${index}`}
                         x1={x}
-                        y1="20"
+                        y1="10"
                         x2={x}
-                        y2="400"
+                        y2="390"
                         stroke="currentColor"
                         strokeDasharray="2,2"
                         opacity="0.3"
@@ -286,7 +288,7 @@ export default function CandlestickChart({ data, currencySymbol }: CandlestickCh
                     );
                   }
                 }
-                
+
                 // 最後の目盛りを追加
                 if (data.length > 0 && tickCount > 0) {
                   const lastIndex = data.length - 1;
@@ -297,9 +299,9 @@ export default function CandlestickChart({ data, currencySymbol }: CandlestickCh
                       <line
                         key={`tick-${lastIndex}`}
                         x1={x}
-                        y1="400"
+                        y1="390"
                         x2={x}
-                        y2="410"
+                        y2="400"
                         stroke="currentColor"
                       />
                     );
@@ -307,9 +309,9 @@ export default function CandlestickChart({ data, currencySymbol }: CandlestickCh
                       <line
                         key={`grid-${lastIndex}`}
                         x1={x}
-                        y1="20"
+                        y1="10"
                         x2={x}
-                        y2="400"
+                        y2="390"
                         stroke="currentColor"
                         strokeDasharray="2,2"
                         opacity="0.3"
@@ -321,9 +323,58 @@ export default function CandlestickChart({ data, currencySymbol }: CandlestickCh
                 return ticks;
               })()}
             </g>
+
+            {/* X軸ラベル（日付）をSVG内に配置 */}
+            <g className="text-xs fill-gray-600 dark:fill-gray-400">
+              {(() => {
+                const tickCount = Math.min(10, Math.floor(data.length / 5));
+                const interval = Math.floor(data.length / tickCount);
+                const labels = [];
+
+                for (let i = 0; i < tickCount; i++) {
+                  const index = i * interval;
+                  if (index < data.length) {
+                    const x = 50 + index * candleSpacing + candleSpacing / 2;
+                    labels.push(
+                      <text
+                        key={`label-${index}`}
+                        x={x}
+                        y="410"
+                        textAnchor="middle"
+                        className="text-xs"
+                      >
+                        {data[index]?.displayDate}
+                      </text>
+                    );
+                  }
+                }
+
+                // 最後のデータポイントを追加
+                if (data.length > 0 && tickCount > 0) {
+                  const lastIndex = data.length - 1;
+                  const lastInterval = (tickCount - 1) * interval;
+                  if (lastIndex > lastInterval) {
+                    const x = 50 + lastIndex * candleSpacing + candleSpacing / 2;
+                    labels.push(
+                      <text
+                        key={`label-${lastIndex}`}
+                        x={x}
+                        y="410"
+                        textAnchor="middle"
+                        className="text-xs"
+                      >
+                        {data[lastIndex]?.displayDate}
+                      </text>
+                    );
+                  }
+                }
+
+                return labels;
+              })()}
+            </g>
           </svg>
         </div>
-        
+
         {/* カスタムツールチップ */}
         {showTooltip && tooltipData && (
           <div
@@ -409,65 +460,10 @@ export default function CandlestickChart({ data, currencySymbol }: CandlestickCh
             )}
           </div>
         )}
-        
-        {/* X軸ラベル */}
-        <div className="mt-4">
-          <div className="relative w-full" style={{ marginLeft: '50px', marginRight: '50px' }}>
-            <div className="relative" style={{ width: `${Math.max(chartWidth, data.length * 10)}px` }}>
-              {(() => {
-                const tickCount = Math.min(10, Math.floor(data.length / 5));
-                const interval = Math.floor(data.length / tickCount);
-                const labels = [];
-                
-                for (let i = 0; i < tickCount; i++) {
-                  const index = i * interval;
-                  if (index < data.length) {
-                    const leftPosition = (index * candleSpacing + candleSpacing / 2) / Math.max(chartWidth, data.length * 10) * 100;
-                    labels.push(
-                      <span 
-                        key={index} 
-                        className="absolute text-xs text-gray-600 dark:text-gray-400 text-center transform -translate-x-1/2"
-                        style={{ 
-                          left: `${leftPosition}%`,
-                          minWidth: '60px'
-                        }}
-                      >
-                        {data[index]?.displayDate}
-                      </span>
-                    );
-                  }
-                }
-                
-                // 最後のデータポイントを追加
-                if (data.length > 0 && tickCount > 0) {
-                  const lastIndex = data.length - 1;
-                  const lastInterval = (tickCount - 1) * interval;
-                  if (lastIndex > lastInterval) {
-                    const leftPosition = (lastIndex * candleSpacing + candleSpacing / 2) / Math.max(chartWidth, data.length * 10) * 100;
-                    labels.push(
-                      <span 
-                        key={lastIndex} 
-                        className="absolute text-xs text-gray-600 dark:text-gray-400 text-center transform -translate-x-1/2"
-                        style={{ 
-                          left: `${leftPosition}%`,
-                          minWidth: '60px'
-                        }}
-                      >
-                        {data[lastIndex]?.displayDate}
-                      </span>
-                    );
-                  }
-                }
-                
-                return labels;
-              })()}
-            </div>
-          </div>
-        </div>
       </div>
       
       {/* 凡例 */}
-      <div className="flex items-center justify-center mt-4 space-x-6 text-sm">
+      <div className="flex items-center justify-center mt-2 space-x-6 text-sm">
         <div className="flex items-center space-x-2">
           <div className="w-4 h-2 bg-white border border-green-500"></div>
           <span>上昇</span>

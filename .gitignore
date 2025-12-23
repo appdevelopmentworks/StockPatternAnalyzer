@@ -30,6 +30,9 @@ pids
 /nyc_output
 /.nyc_output
 
+# Ukewatasi
+/ukewatasi
+
 # Instrumentation
 .nyc_output
 *.lcov
